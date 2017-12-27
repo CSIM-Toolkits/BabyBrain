@@ -5,17 +5,17 @@ from slicer.ScriptedLoadableModule import *
 import logging
 
 #
-# BabyWholeBrain
+# BabyBrainPreparation
 #
 
-class BabyWholeBrain(ScriptedLoadableModule):
+class BabyBrainPreparation(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "BabyWholeBrain" # TODO make this more human readable by adding spaces
+    self.parent.title = "BabyBrainPreparation" # TODO make this more human readable by adding spaces
     self.parent.categories = ["Examples"]
     self.parent.dependencies = []
     self.parent.contributors = ["John Doe (AnyWare Corp.)"] # replace with "Firstname Lastname (Organization)"
@@ -30,10 +30,10 @@ and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR0132
 """ # replace with organization, grant and thanks.
 
 #
-# BabyWholeBrainWidget
+# BabyBrainPreparationWidget
 #
 
-class BabyWholeBrainWidget(ScriptedLoadableModuleWidget):
+class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
@@ -128,16 +128,16 @@ class BabyWholeBrainWidget(ScriptedLoadableModuleWidget):
     self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
 
   def onApplyButton(self):
-    logic = BabyWholeBrainLogic()
+    logic = BabyBrainPreparationLogic()
     enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
     imageThreshold = self.imageThresholdSliderWidget.value
     logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
 
 #
-# BabyWholeBrainLogic
+# BabyBrainPreparationLogic
 #
 
-class BabyWholeBrainLogic(ScriptedLoadableModuleLogic):
+class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
   """This class should implement all the actual
   computation done by your module.  The interface
   should be such that other python code can import
@@ -227,14 +227,14 @@ class BabyWholeBrainLogic(ScriptedLoadableModuleLogic):
 
     # Capture screenshot
     if enableScreenshots:
-      self.takeScreenshot('BabyWholeBrainTest-Start','MyScreenshot',-1)
+      self.takeScreenshot('BabyBrainPreparationTest-Start','MyScreenshot',-1)
 
     logging.info('Processing completed')
 
     return True
 
 
-class BabyWholeBrainTest(ScriptedLoadableModuleTest):
+class BabyBrainPreparationTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
   Uses ScriptedLoadableModuleTest base class, available at:
@@ -250,9 +250,9 @@ class BabyWholeBrainTest(ScriptedLoadableModuleTest):
     """Run as few or as many tests as needed here.
     """
     self.setUp()
-    self.test_BabyWholeBrain1()
+    self.test_BabyBrainPreparation1()
 
-  def test_BabyWholeBrain1(self):
+  def test_BabyBrainPreparation1(self):
     """ Ideally you should have several levels of tests.  At the lowest level
     tests should exercise the functionality of the logic with different inputs
     (both valid and invalid).  At higher levels your tests should emulate the
@@ -284,6 +284,6 @@ class BabyWholeBrainTest(ScriptedLoadableModuleTest):
     self.delayDisplay('Finished with download and loading')
 
     volumeNode = slicer.util.getNode(pattern="FA")
-    logic = BabyWholeBrainLogic()
+    logic = BabyBrainPreparationLogic()
     self.assertIsNotNone( logic.hasImageData(volumeNode) )
     self.delayDisplay('Test passed!')

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-set(MODULE_NAME BabyWholeBrain)
+set(MODULE_NAME BabyBrainPreparation)
 
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS

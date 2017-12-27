@@ -19,7 +19,8 @@ include(${Slicer_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Extension modules
-add_subdirectory(BabyWholeBrain)
+add_subdirectory(BabyBrainSegmentation)
+add_subdirectory(BabyBrainPreparation)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------

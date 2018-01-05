@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Utilities.CSIM Supporting Modules.Baby Brain</category>
+  <title>Split Label Values</title>
+  <description><![CDATA[This is a CLI module with the goal of spliting label values following an additive rule. This could be useful to separate determined areas of the original label map in different constant values, e.g. brain hemispheres.]]></description>
+  <version>0.0.1</version>
+  <documentation-url>https://www.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/SplitLabelValues</documentation-url>
+  <license>Slicer</license>
+  <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo)</contributor>
+  <acknowledgements>This work was partially funded by CNPq grant ...</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image type="label">
+      <name>inputLabel</name>
+      <label>Input Label</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input label]]></description>
+    </image>
+    <image type="label">
+      <name>splitLabel</name>
+      <label>Split Label</label>
+      <channel>input</channel>
+      <index>1</index>
+      <description><![CDATA[Split label is a label that defines how the input label volume should be splitted. For instance, it could be used for brain hemispheres separations which the input image could be the whole brain segmentation and the split label is a label map indicating one hemisphere.]]></description>
+    </image>
+    <image  type="label">
+      <name>outputLabel</name>
+      <label>Output Label</label>
+      <channel>output</channel>
+      <index>2</index>
+      <description><![CDATA[Output Volume]]></description>
+    </image>
+  </parameters>
+<parameters>
+    <label>Split Parameters</label>
+    <description><![CDATA[Split parameters]]></description>
+    <integer>
+      <name>labelSideA</name>
+      <longflag>--sideA</longflag>
+      <flag>a</flag>
+      <label>Side A Value</label>
+      <description><![CDATA[Indicates the additive value that will be placed in the side A of the split label.]]></description>
+      <default>10</default>
+    </integer>
+    <integer>
+      <name>labelSideB</name>
+      <longflag>--sideB</longflag>
+      <flag>b</flag>
+      <label>Side B Value</label>
+      <description><![CDATA[Indicates the additive value that will be placed in the side B of the split label.]]></description>
+      <default>20</default>
+    </integer>
+    <boolean>
+      <name>doKeepSomeValues</name>
+      <longflag>--keepSomeValues</longflag>
+      <description><![CDATA[Choose if you want maintain some label values found in the input label map.]]></description>
+      <label>Keep Some Label Values</label>
+      <default>false</default>
+	</boolean>
+    <integer-vector>
+      <name>keepSideA</name>
+      <longflag>--keepA</longflag>
+      <label>Keep Label (Side A)</label>
+      <description><![CDATA[Defines what values in side A that should keep the original value. NOTE: The background value is always maintaned as zero!]]></description>
+      <default>1</default>
+    </integer-vector>
+    <integer-vector>
+      <name>keepSideB</name>
+      <longflag>--keepB</longflag>
+      <label>Keep Label (Side B)</label>
+      <description><![CDATA[Defines what values in side B that should keep the original value. NOTE: The background value is always maintaned as zero!]]></description>
+      <default>1</default>
+    </integer-vector>
+</parameters>
+</executable>

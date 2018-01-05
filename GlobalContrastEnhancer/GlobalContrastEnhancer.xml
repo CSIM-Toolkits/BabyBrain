@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Utilities.CSIM Supporting Modules.Baby Brain</category>
+  <title>Global Contrast Enhancer</title>
+  <description><![CDATA[This is a CLI module that offers a set of image contrast enhancement function in order to increase the signal differece between objects. This can be helpful for biomedical images that presents poor contrast among tissues, e.g. brain MRI.]]></description>
+  <version>1.0.0</version>
+  <documentation-url>https://www.slicer.org/wiki/Documentation/Nightly/Modules/GlobalContrastEnhancer</documentation-url>
+  <license>Slicer</license>
+  <contributor>Antonio Carlos Senra Filho (University of Sao Paulo)</contributor>
+  <acknowledgements>This work was partially funded by CNPq grant ...</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image type="scalar">
+      <name>inputVolume</name>
+      <label>Input Volume</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input volume]]></description>
+    </image>
+    <image type="scalar">
+      <name>outputVolume</name>
+      <label>Output Volume</label>
+      <channel>output</channel>
+      <index>1</index>
+      <description><![CDATA[Output Volume]]></description>
+    </image>
+  </parameters>
+  <parameters>
+    <label>Contrast Enhancement Parameters</label>
+    <description><![CDATA[Contrast enhancement parameters]]></description>
+    <double>
+      <name>higherCut</name>
+      <longflag>hCut</longflag>
+      <label>Higher Cut</label>
+      <description><![CDATA[Defines the outlier removal of the input image (the brighter values) based on the percentile of the image histogram.]]></description>
+      <default>0.98</default>
+      <constraints>
+        <minimum>0.01</minimum>
+        <maximum>0.99</maximum>
+        <step>0.01</step>
+      </constraints>
+    </double>
+    <double>
+      <name>lowerCut</name>
+      <longflag>lCut</longflag>
+      <label>Lower Cut</label>
+      <description><![CDATA[Defines the outlier removal of the input image (the darker values) based on the percentile of the image histogram.]]></description>
+      <default>0.02</default>
+      <constraints>
+        <minimum>0.01</minimum>
+        <maximum>0.99</maximum>
+        <step>0.01</step>
+      </constraints>
+    </double>
+    <string-enumeration>
+      <name>algorithm</name>
+	  <longflag>--algorithm</longflag>
+	  <description><![CDATA[A set of global image contrast enhancement algorithm that are implemented in this module.]]></description>
+	  <label>Contrast Enhancement Algorithm</label>
+	  <default>Logistic</default>
+	  <element>Logistic</element>
+   	  <element>CLAHE</element>
+	  <element>CDF</element>
+    </string-enumeration>
+    <double>
+      <name>maximumScaling</name>
+      <longflag>max</longflag>
+      <label>Maximum Scaling</label>
+      <description><![CDATA[This value is ONLY used in the logistic contrast enhancement algorithm, which informs the maximum scaling factor to the contrast enhancement method. The higher it is, the stronger will be contrast modulation.]]></description>
+      <default>2.0</default>
+    </double>
+    <double>
+      <name>minimumScaling</name>
+      <longflag>min</longflag>
+      <label>Minimum Scaling</label>
+      <description><![CDATA[This value is ONLY used in the logistic contrast enhancement algorithm, which informs the minimum scaling factor to the contrast enhancement method. The lower it is, the stronger will be contrast modulation.]]></description>
+      <default>0.0</default>
+    </double>
+    <boolean>
+	  <name>flipFunction</name>
+	  <longflag>--flipON</longflag>
+	  <description><![CDATA[This value is ONLY used in the logistic contrast enhancement algorithm, in which you may want to flip the contrast enhancement calculation in the input image. This will invert the weighting function.]]></description>
+	  <label>Flip Weigthing Function</label>
+	  <default>false</default>
+    </boolean>
+</parameters>
+</executable>

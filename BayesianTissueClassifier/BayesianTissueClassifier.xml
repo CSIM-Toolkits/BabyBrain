@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Utilities.CSIM Supporting Modules.Baby Brain</category>
+  <title>Bayesian Tissue Classifier</title>
+  <description><![CDATA[This module aims to extract the major brain tissues mask. This tool was intensively tested with T1 MRI images, but the pipeline could be applied to any other structural MRI image. Here, it is applied a simple image processing pipeline based on voxel intensity segmentation in order to offer a simple brain tissue segmentation.]]></description>
+  <version>0.0.1</version>
+  <documentation-url>https://www.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/BayesianTissueClassifier</documentation-url>
+  <license>Slicer</license>
+  <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo)</contributor>
+  <acknowledgements>This work was partially funded by CNPq grant ...</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image type="scalar">
+      <name>inputVolume</name>
+      <label>Input Volume</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input volume. The algorithm works better with high resolution T1 MRI images alread brain extract and inhomogeneity corrected.]]></description>
+    </image>
+    <string-enumeration>
+	      <name>imageModality</name>
+	      <longflag>--modality</longflag>
+	      <description><![CDATA[Select the image modality inserted as a input volume.]]></description>
+	      <label>Image Modality</label>
+	      <default>T1</default>
+	      <element>T1</element>
+	      <element>T2</element>
+	      <element>PD</element>
+	</string-enumeration>
+    <integer>
+      <name>numberOfTissues</name>
+      <longflag>--nTissues</longflag>
+      <flag>n</flag>
+      <label>Number of Tissues</label>
+      <description><![CDATA[Defines the number of tissues found in the input image. NOTE: The background is also counted as a single tissue.]]></description>
+      <default>4</default>
+    </integer>
+    <integer-vector>
+      <name>labelsDefinition</name>
+      <longflag>--definitions</longflag>
+      <flag>d</flag>
+      <label>Labels Definition</label>
+      <description><![CDATA[Defines the values adopted for each label. The values will follow an ascendenting order. NOTE: The background value is always maintaned as zero!]]></description>
+      <default>1,2,3</default>
+    </integer-vector>
+    <image type="label">
+      <name>outputLabel</name>
+      <label>Brain Mask</label>
+      <channel>output</channel>
+      <index>1</index>
+      <description><![CDATA[Output brain tissue mask.]]></description>
+    </image>
+  </parameters>
+<parameters>
+<label>Tissue Type Output</label>
+  <description><![CDATA[Parameters to be applied on the brain segmentation procedure.]]></description>
+	<boolean>
+	      <name>oneTissue</name>
+	      <longflag>--oneTissue</longflag>
+	      <description><![CDATA[Choose if you want all the tissues classes or only one class segmented.]]></description>
+	      <label>Separate one tissue class</label>
+	      <default>false</default>
+	</boolean>
+    <integer>
+      <name>typeTissue</name>
+      <longflag>--type</longflag>
+      <flag>t</flag>
+      <label>Tissue Value</label>
+      <description><![CDATA[Choose what is the brain tissue label that you want as the output label. The order is always from the darkest to the brightest tissue in the image.]]></description>
+      <default>2</default>
+    </integer>
+</parameters>
+</executable>

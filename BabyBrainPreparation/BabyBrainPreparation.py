@@ -580,7 +580,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     volumesLogic.CreateScalarVolumeFromVolume(slicer.mrmlScene, outputVolume, inputVolume)
 
     # TODO Tentar novamente criar uma barra de progresso : slicer.util.createProgressDialog
-    # progressbar = slicer.util.createProgressDialog(autoClose=False)
+    # progressbar = slicer.util.createProgressDialog(parent=slicer.util.mainWindow(),autoClose=False)
 
     if useResampling:
         #
@@ -590,6 +590,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                        , outputVolume
                                        , voxelResampling
                                        , interpolation)
+        slicer.util.showStatusMessage("Image resampling space is finished...")
     # slicer.app.processEvents()
     # progressbar.value = 20
     # progressbar.labelText = "Space Resampling..."
@@ -605,6 +606,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                , shrinkFactor_1
                                , useResampling
                                , voxelResampling)
+        slicer.util.showStatusMessage("Bias field correction (first level) is finished...")
 
     if useAAD:
         #
@@ -620,7 +622,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                                  , conductanceFunction
                                                  , applyConductanceRegularization
                                                  , conductanceRegularization)
-
+        slicer.util.showStatusMessage("Image noise attenuation is finished...")
+        # progressbar.value = 40
+        # progressbar.labelText = "Image noise attenuation..."
 
     if useN4ITK:
         #
@@ -633,6 +637,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                , shrinkFactor_2
                                , useResampling
                                , voxelResampling)
+        slicer.util.showStatusMessage("Bias field correction (second level) is finished...")
 
     if useGlobalContrastEnhancement:
         #
@@ -646,11 +651,14 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                        , maxWeight
                                        , minWeight
                                        , useFlip)
+        slicer.util.showStatusMessage("Global contrast enhancement is finished...")
 
     # progressbar.value = 100
     # slicer.app.processEvents()
     # progressbar.labelText = "Baby Brain - Preparation is finished!"
+
     logging.info('Processing completed')
+    slicer.util.showStatusMessage("Baby Brain Preparation is finished!")
 
     return True
 

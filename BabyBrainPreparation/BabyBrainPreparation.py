@@ -332,7 +332,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setShrinkFactorFirstLevelWidget.setValue(4)
     self.setShrinkFactorFirstLevelWidget.setToolTip(
       "Defines how much the image should be upsampled before estimating the inhomogeneity field. Increase if you want to reduce the execution"
-      " time. 1 corresponds to the original resolution. Larger values will significantly reduce the computation time.")
+      " time. 1 corresponds to the original resolution. Larger values will significantly reduce the computation time, however may not resolve"
+      "images with strong field inhomogeneity.")
     parametersBiasCorrectionLayout.addRow("Shrink Factor (First Level) ", self.setShrinkFactorFirstLevelWidget)
 
     #
@@ -341,7 +342,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setShrinkFactorSecondLevelWidget = qt.QSpinBox()
     self.setShrinkFactorSecondLevelWidget.setMinimum(1)
     self.setShrinkFactorSecondLevelWidget.setMaximum(30)
-    self.setShrinkFactorSecondLevelWidget.setValue(1)
+    self.setShrinkFactorSecondLevelWidget.setValue(3)
     self.setShrinkFactorSecondLevelWidget.setToolTip(
       "The same as in Shrink Factor (First Level).")
     parametersBiasCorrectionLayout.addRow("Shrink Factor (Second Level) ", self.setShrinkFactorSecondLevelWidget)
@@ -375,17 +376,17 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     LogisticParametersLayout = qt.QFormLayout()
     self.groupGlobalContrastParametersBoxButtons.setLayout(LogisticParametersLayout)
 
-    self.setHigherCutWidget = ctk.ctkSliderWidget()
+    self.setHigherCutWidget = ctk.ctkSliderWidget() # TODO Ver como fazer um doubleSpingBox parecido com o windowsLevel...
     self.setHigherCutWidget.maximum = 0.99
     self.setHigherCutWidget.minimum = 0.01
-    self.setHigherCutWidget.value = 0.98
+    self.setHigherCutWidget.value = 0.96
     self.setHigherCutWidget.singleStep = 0.01
     self.setHigherCutWidget.setToolTip("Higher cut parameter.")
 
     self.setLowerCutWidget = ctk.ctkSliderWidget()
     self.setLowerCutWidget.maximum = 0.99
     self.setLowerCutWidget.minimum = 0.01
-    self.setLowerCutWidget.value = 0.02
+    self.setLowerCutWidget.value = 0.04
     self.setLowerCutWidget.singleStep = 0.01
     self.setLowerCutWidget.setToolTip("Lower cut parameter.")
 
@@ -581,6 +582,8 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
     # TODO Tentar novamente criar uma barra de progresso : slicer.util.createProgressDialog
     # progressbar = slicer.util.createProgressDialog(parent=slicer.util.mainWindow(),autoClose=False)
+
+    # TODO Verificar se fazer a separacao brainstem+cerebellum do resto pode ser melhor para poder filtrar com o filtro AAD. A imagem enh.nrrd parece q tem distorce as bordas do cerebello...dai fica ruim a segmentao da fossa posterior
 
     if useResampling:
         #

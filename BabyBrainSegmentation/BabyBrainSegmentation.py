@@ -189,11 +189,11 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     # Neighborhood Size
     #
     self.setNeighborhoodSizeLineEditWidget = qt.QLineEdit()
-    self.setNeighborhoodSizeLineEditWidget.setText("0.2,0.2,1")
+    self.setNeighborhoodSizeLineEditWidget.setText("5,5,1")
     self.setNeighborhoodSizeLineEditWidget.setToolTip(
       "Choose the neighborhood applied on the median filter. A large neighborhood will provide a smoother version of the"
-      "brain label, however minor details may vanish. TIP: It is commonly used a size of 3x to 5x of the smallest voxel"
-      "resolution, e.g. if the input image has 0.2x0.2x1.0 mm3, than the size could be 0.6x0.6x1.0.")
+      "brain label, however minor details may vanish. TIP: It is commonly used a size of 2x to 5x of the smallest voxel"
+      "size, e.g. if the input image has 0.2x0.2x1.0 mm3 (1x1x1 voxels), than the neighborhood size would be [2,2,1].")
     parametersMedianFilterLayout.addRow("Neighborhood Size ", self.setNeighborhoodSizeLineEditWidget)
 
     #
@@ -202,7 +202,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     self.setMedianIterationsWidget = qt.QSpinBox()
     self.setMedianIterationsWidget.setMinimum(1)
     self.setMedianIterationsWidget.setMaximum(20)
-    self.setMedianIterationsWidget.setValue(1)
+    self.setMedianIterationsWidget.setValue(2)
     self.setMedianIterationsWidget.setToolTip(
       "Set how many median filtering will be applied. The higher it is, the stronger will be the label smoothing.")
     parametersMedianFilterLayout.addRow("Interations ", self.setMedianIterationsWidget)
@@ -223,7 +223,8 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     #
     self.setBrainAtlasComboBoxWidget = ctk.ctkComboBox()
     self.setBrainAtlasComboBoxWidget.addItem("NEO2012") # TODO Ver se usa tambem outro template (2015, http://brain-development.org/brain-atlases/multi-structural-neonatal-brain-atlas/)
-    self.setBrainAtlasComboBoxWidget.addItem("FET2012") # TODO Preparar hemispheres, cerebellum e brainstem.. Adicionar err se adicionado este atlas e imagem T1 e com dgm!
+    # self.setBrainAtlasComboBoxWidget.addItem("NEO2015") # TODO Novo brain atlas com o mesmo padrao do NEO2012... tem mais detalhes de segmentacao
+    self.setBrainAtlasComboBoxWidget.addItem("FET2012") # TODO Preparar cerebellum e brainstem.
     # self.setBrainAtlasComboBoxWidget.addItem("PED2008") # TODO PED2008 precisa separar todas as areas... ver se realmente precisa para agora ou deixa para UPGRADE
     self.setBrainAtlasComboBoxWidget.setToolTip(
       "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
@@ -241,7 +242,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     self.setSubjectAgeIntegerWidget.singleStep = 1
     self.setSubjectAgeIntegerWidget.setToolTip("Select the subject's age in weeks. This is only used for neonatal and fetal brain atlases. "
                                                "NOTE: Each atlas has its own age range, with NEO2012=27-44 and FET2012=23-37 weeks, respectivelly."
-                                               "If you choose an age belowe (above), the lower (higher) age will be chosen.")
+                                               "If you choose an age below (above), the lower (higher) age will be chosen.")
     parametersAtlasPropagationLayout.addRow("Age ", self.setSubjectAgeIntegerWidget)
 
     #
@@ -761,7 +762,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     tmpBrainOnlyNode = slicer.vtkMRMLScalarVolumeNode()
     tmpBrainOnlyNode.SetName("resampled_input_brainOnly")
     slicer.mrmlScene.AddNode(tmpBrainOnlyNode)
-    sitkUtils.PushVolumeToSlicer(output_brainOnly_Image, tmpBrainOnlyNode)
+    sitkUtils.PushVolumeToSlicer(output_brainOnly_Image, tmpBrainOnlyNode) # TODO Ver como carregar estas labels sem atualizar a scene... nao fica legal ver essas labels intermediarias durante o processamento
 
     slicer.util.showStatusMessage("Brainstem and cerebellum removal is finished...")
 
@@ -844,7 +845,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                            , 4
                            , brainOnlyLabelMask
                            , definitions=definitions)
-    slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...")
+    slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...") # TODO Sera que passar median filter aqui eh melhor do que no final?
 
     ######################################################################################
     # Step  - Split brain hemispheres (only adjust the mask on the native space)
@@ -928,7 +929,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     params = {}
     params['inputLabel'] = brainOnlyLabelMask.GetID()
     params['splitLabel'] = tmpVentriculesLabelMask.GetID()
-    params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID()
+    params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID() # TODO Verificar se ao inves de marcar os ventriculos apenas pelos labels, fazer a segmentacao novamente pode ser melhor. O cerebro pode ja vir filtrado com median filter e os ventriculos sao resegmentados...
     if modality == "T1":
         params['labelSideA'] = 9
     else:
@@ -1023,8 +1024,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       params['inputVolume'] = outputVolume
       params['outputVolume'] = outputVolume
 
-      slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
-      slicer.util.showStatusMessage("Whole brain (second) segmentation is finished...")
+      slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True) # TODO Verificar se o median filter eh dado em voxel ou em mm
+      slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
 
     if not debugMode:
       ######################################################################################
@@ -1062,6 +1063,9 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
 
     return True
 
+  #
+  # Atlas Propagation
+  #
   def atlasPropagation(self, registrationAlgorithm
                        , fixedNode
                        , movingNode
@@ -1079,6 +1083,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       regParams = {}
       regParams["fixedVolume"] = fixedNode.GetID()
       regParams["movingVolume"] = movingNode.GetID()
+      regParams["outputVolume"] = movingNode.GetID()
       regParams["samplingPercentage"] = sampling
       regParams["linearTransform"] = transformLinear.GetID()
       regParams["initializeTransformMode"] = initMethod
@@ -1094,7 +1099,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       regParams["movingVolume"] = movingNode.GetID()
       regParams["samplingPercentage"] = sampling
       regParams["bsplineTransform"] = transformElastic.GetID()
-      regParams['initialTransform'] = transformLinear.GetID()
+      # regParams['initialTransform'] = transformLinear.GetID()
       regParams["initializeTransformMode"] = "Off"
       regParams["splineGridSize"] = splineGrid
       regParams["useBSpline"] = True
@@ -1129,7 +1134,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       os.system("rm -R " + tmpFolder)
 
   #
-  # Atlas Propagation
+  # Registration Transform Application
   #
   def applyRegistrationTransforms(self, registrationAlgorithm
                                   , inputVolume
@@ -1139,51 +1144,35 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                   , transformWarp
                                   , isLabel):
 
-    if registrationAlgorithm == "BRAINSFit":
-      params = {}
-      params["inputVolume"] = inputVolume.GetID()
-      params["referenceVolume"] = referenceVolume.GetID()
-      params["outputVolume"] = outputVolume.GetID()
-      params["warpTransform"] = transformWarp.GetID()
-      params["inverseTransform"] = False
-      if isLabel:
-        params["interpolationMode"] = "NearestNeighbor"
-        params["pixelType"] = "binary"
-      else:
-        params["interpolationMode"] = "BSpline"
-        params["pixelType"] = "float"
-
-      slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+    params = {}
+    params["inputVolume"] = inputVolume.GetID()
+    params["referenceVolume"] = referenceVolume.GetID()
+    params["outputVolume"] = outputVolume.GetID()
+    params["warpTransform"] = transformLinear.GetID()
+    params["inverseTransform"] = False
+    if isLabel:
+      params["interpolationMode"] = "NearestNeighbor"
+      params["pixelType"] = "binary"
     else:
-      params = {}
-      params["inputVolume"] = inputVolume.GetID()
-      params["referenceVolume"] = referenceVolume.GetID()
-      params["outputVolume"] = outputVolume.GetID()
-      params["warpTransform"] = transformLinear.GetID()
-      params["inverseTransform"] = False
-      if isLabel:
-        params["interpolationMode"] = "NearestNeighbor"
-        params["pixelType"] = "binary"
-      else:
-        params["interpolationMode"] = "BSpline"
-        params["pixelType"] = "float"
+      params["interpolationMode"] = "BSpline"
+      params["pixelType"] = "float"
 
-      slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+    slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
 
-      params = {}
-      params["inputVolume"] = outputVolume.GetID()
-      params["referenceVolume"] = inputVolume.GetID()
-      params["outputVolume"] = outputVolume.GetID()
-      params["warpTransform"] = transformWarp.GetID()
-      params["inverseTransform"] = False
-      if isLabel:
-        params["interpolationMode"] = "NearestNeighbor"
-        params["pixelType"] = "binary"
-      else:
-        params["interpolationMode"] = "BSpline"
-        params["pixelType"] = "float"
+    params = {}
+    params["inputVolume"] = outputVolume.GetID()
+    params["referenceVolume"] = inputVolume.GetID()
+    params["outputVolume"] = outputVolume.GetID()
+    params["warpTransform"] = transformWarp.GetID()
+    params["inverseTransform"] = False
+    if isLabel:
+      params["interpolationMode"] = "NearestNeighbor"
+      params["pixelType"] = "binary"
+    else:
+      params["interpolationMode"] = "BSpline"
+      params["pixelType"] = "float"
 
-      slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+    slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
 
   #
   # Image Resampling Resolution
@@ -1222,6 +1211,9 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
 
     slicer.cli.run(slicer.modules.bayesiantissueclassifier, None, params, wait_for_completion=True)
 
+  #
+  # Combine Labels
+  #
   def combineLabels(self, firstLabel
                     , secondLabel
                     , outputLabel

@@ -1,5 +1,7 @@
 import os
 import multiprocessing
+import platform
+import sys
 import unittest
 import vtk, qt, ctk, slicer
 import SimpleITK as sitk
@@ -7,6 +9,7 @@ import sitkUtils
 from slicer.ScriptedLoadableModule import *
 import logging
 
+from os.path import expanduser
 #
 # BabyBrainPreparation
 #
@@ -75,6 +78,16 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
 
     #
+    # Image Modality
+    #
+    self.setImageModalityBooleanWidget = ctk.ctkComboBox()
+    self.setImageModalityBooleanWidget.addItem("T2")
+    self.setImageModalityBooleanWidget.addItem("T1")
+    self.setImageModalityBooleanWidget.setToolTip(
+      "MRI strutural image inserted as a input volume.")
+    parametersFormLayout.addRow("Image Modality ", self.setImageModalityBooleanWidget)
+
+    #
     # output volume selector
     #
     self.outputSelector = slicer.qMRMLNodeComboBox()
@@ -100,15 +113,15 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     parametersEnhancementLayout = qt.QFormLayout(parametersEnhancementCollapsibleButton)
 
-    #
-    # Apply Image Space Resampling
-    #
-    self.setApplyImageResamplingBooleanWidget = ctk.ctkCheckBox()
-    self.setApplyImageResamplingBooleanWidget.setChecked(True)
-    self.setApplyImageResamplingBooleanWidget.setToolTip(
-      "Apply an image space resampling in the input image in order to reduce the total processing time. This is helpful for "
-      "image with large scale space (usually higher than 256^3 mm).")
-    parametersEnhancementLayout.addRow("Apply Image Space Resampling", self.setApplyImageResamplingBooleanWidget)
+    # #
+    # # Apply Image Space Resampling
+    # #
+    # self.setApplyImageResamplingBooleanWidget = ctk.ctkCheckBox()
+    # self.setApplyImageResamplingBooleanWidget.setChecked(True)
+    # self.setApplyImageResamplingBooleanWidget.setToolTip(
+    #   "Apply an image space resampling in the input image in order to reduce the total processing time. This is helpful for "
+    #   "image with large scale space (usually higher than 256^3 mm).")
+    # parametersEnhancementLayout.addRow("Apply Image Space Resampling", self.setApplyImageResamplingBooleanWidget)
 
     #
     # Apply AAD filtering
@@ -141,13 +154,12 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
       "original image may present a poor separation between brain tissues.")
     parametersEnhancementLayout.addRow("Apply Global Contrast Enhancement Function", self.setApplyGlobalEnhancementBooleanWidget)
 
-
     #
     # Image Space Resampling Parameters Area
     #
     parametersImageResamplingCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersImageResamplingCollapsibleButton.text = "Image Space Resampling Parameters"
-    parametersImageResamplingCollapsibleButton.collapsed = True
+    parametersImageResamplingCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersImageResamplingCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -177,6 +189,193 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setInterpolationFunctionComboBoxWidget.setToolTip(
       "Interpolation functions.")
     parametersImageResamplingLayout.addRow("Interpolation ", self.setInterpolationFunctionComboBoxWidget)
+
+    #
+    # Atlas Propagation Parameters Area
+    #
+    parametersAtlasPropagationCollapsibleButton = ctk.ctkCollapsibleButton()
+    parametersAtlasPropagationCollapsibleButton.text = "Atlas Propagation Parameters"
+    parametersAtlasPropagationCollapsibleButton.collapsed = True
+    self.layout.addWidget(parametersAtlasPropagationCollapsibleButton)
+
+    # Layout within the dummy collapsible button
+    parametersAtlasPropagationLayout = qt.QFormLayout(parametersAtlasPropagationCollapsibleButton)
+
+    #
+    # Apply Brain Volume Refinement
+    #
+    self.setApplyBrainVolumeRefinementBooleanWidget = ctk.ctkCheckBox()
+    self.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
+    self.setApplyBrainVolumeRefinementBooleanWidget.setToolTip(
+        "Check this if you want to refine the brain volume using the atlas brain mask. This step can be helpful if the "
+        "brain extraction procedure left some non-brain tissues in the input image.")
+    parametersAtlasPropagationLayout.addRow("Apply Brain Volume Refinement",
+                                            self.setApplyBrainVolumeRefinementBooleanWidget)
+
+    #
+    # Brain Atlas
+    #
+    self.setBrainAtlasComboBoxWidget = ctk.ctkComboBox()
+    self.setBrainAtlasComboBoxWidget.addItem("NEO2012")  # TODO Ver se usa tambem outro template (2015, http://brain-development.org/brain-atlases/multi-structural-neonatal-brain-atlas/)
+    # self.setBrainAtlasComboBoxWidget.addItem("NEO2015") # TODO Novo brain atlas com o mesmo padrao do NEO2012... tem mais detalhes de segmentacao
+    self.setBrainAtlasComboBoxWidget.addItem("FET2012")  # TODO Preparar cerebellum e brainstem.
+    # self.setBrainAtlasComboBoxWidget.addItem("PED2008") # TODO PED2008 precisa separar todas as areas... ver se realmente precisa para agora ou deixa para UPGRADE
+    self.setBrainAtlasComboBoxWidget.setToolTip(
+        "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
+        "binary labels are considered. These brain atlases will mainly help to segment the cerebellum, brainstem and deep"
+        "gray matter. Available atlases: NEO2012 (Neonatal), FET2012 (Fetal) and PED2008 (Pediatric).")
+    parametersAtlasPropagationLayout.addRow("Brain Atlas ", self.setBrainAtlasComboBoxWidget)
+
+    #
+    # Subject Age
+    #
+    self.setSubjectAgeIntegerWidget = ctk.ctkSliderWidget()
+    self.setSubjectAgeIntegerWidget.maximum = 44
+    self.setSubjectAgeIntegerWidget.minimum = 23
+    self.setSubjectAgeIntegerWidget.value = 26
+    self.setSubjectAgeIntegerWidget.singleStep = 1
+    self.setSubjectAgeIntegerWidget.setToolTip(
+        "Select the subject's age in weeks. This is only used for neonatal and fetal brain atlases. "
+        "NOTE: Each atlas has its own age range, with NEO2012=27-44 and FET2012=23-37 weeks, respectivelly."
+        "If you choose an age below (above), the lower (higher) age will be chosen.")
+    parametersAtlasPropagationLayout.addRow("Age ", self.setSubjectAgeIntegerWidget)
+
+    #
+    # Registration Algorithm
+    #
+    self.groupBoxRadioButtons = qt.QGroupBox("Registration Algorithm")
+    RadioButtonLayout = qt.QFormLayout()
+    self.groupBoxRadioButtons.setLayout(RadioButtonLayout)
+    self.setRadioBRAINS = qt.QRadioButton('BRAINSFit')
+    self.setRadioBRAINS.setToolTip("Use the Slicer built-in BRAINSFit algorithm (General Registration).")
+    self.setRadioANTs = qt.QRadioButton('ANTs')
+    self.setRadioANTs.setToolTip(
+        "Use the ANTs SyN diffeomorphic algorithm (recommended). If the ANTs tools are not installed in the user's machine, than this option will be not available.")
+    if os.environ.get('ANTSPATH'):
+        self.setRadioANTs.setChecked(True)
+    else:
+        self.setRadioBRAINS.setChecked(True)
+        self.setRadioANTs.setDisabled(True)
+    RadioButtonLayout.addRow(self.setRadioBRAINS)
+    RadioButtonLayout.addRow(self.setRadioANTs)
+
+    parametersAtlasPropagationLayout.addRow(self.groupBoxRadioButtons)
+
+    #
+    # ANTs Parameters
+    #
+    self.groupANTsParametersBoxButtons = qt.QGroupBox("ANTs Parameters")
+    ANTsParametersLayout = qt.QFormLayout()
+    self.groupANTsParametersBoxButtons.setLayout(ANTsParametersLayout)
+
+    #
+    # Use Quick Registration
+    #
+    self.setUseANTSQuickBooleanWidget = ctk.ctkCheckBox()
+    self.setUseANTSQuickBooleanWidget.setChecked(False)
+    self.setUseANTSQuickBooleanWidget.setToolTip(
+        "Check this if you want to use the antsRegistrationSyNQuick.sh script. This will considerably reduce the "
+        "total time required in the registration step.")
+
+    #
+    # Number of Cores
+    #
+    self.setNumberOfCoresWidget = ctk.ctkSliderWidget()
+    self.setNumberOfCoresWidget.singleStep = 1
+    self.setNumberOfCoresWidget.minimum = 1
+    self.setNumberOfCoresWidget.maximum = multiprocessing.cpu_count()
+    self.setNumberOfCoresWidget.value = self.setNumberOfCoresWidget.maximum - 1
+    self.setNumberOfCoresWidget.setToolTip(
+        "Set the number of CPU's used in the registration process. In order to prevent the SO crash, it is advisable to use N - 1 (N = Total number of cores available).")
+
+    #
+    # Radius for correlation calculation
+    #
+    self.setCorrelationRadiusWidget = qt.QSpinBox()
+    self.setCorrelationRadiusWidget.setMinimum(1)
+    self.setCorrelationRadiusWidget.setMaximum(30)
+    self.setCorrelationRadiusWidget.setValue(4)
+    self.setCorrelationRadiusWidget.setToolTip(
+        "Set the radius for cross correlation metric used in the SyN registration. Units given in number of voxels.")
+
+    ANTsParametersLayout.addRow("Use Quick Registration ", self.setUseANTSQuickBooleanWidget)
+    ANTsParametersLayout.addRow("Number Of Cores ", self.setNumberOfCoresWidget)
+    ANTsParametersLayout.addRow("Radius ", self.setCorrelationRadiusWidget)
+
+    parametersAtlasPropagationLayout.addRow(self.groupANTsParametersBoxButtons)
+
+    #
+    # BRAINSFit Parameters
+    #
+    self.groupBRAINFitParametersBoxButtons = qt.QGroupBox("BRAINSFit Parameters")
+    BRAINSFitParametersLayout = qt.QFormLayout()
+    self.groupBRAINFitParametersBoxButtons.setLayout(BRAINSFitParametersLayout)
+
+    #
+    # Percentage Sampling Area
+    #
+    self.setPercSamplingQWidget = qt.QDoubleSpinBox()
+    self.setPercSamplingQWidget.setDecimals(4)
+    self.setPercSamplingQWidget.setMaximum(0.1)
+    self.setPercSamplingQWidget.setMinimum(0.0001)
+    self.setPercSamplingQWidget.setSingleStep(0.0001)
+    self.setPercSamplingQWidget.setValue(0.05)
+    self.setPercSamplingQWidget.setToolTip("Percentage of voxel used in registration.")
+
+    #
+    # BSpline Grid
+    #
+    self.setBSplineGridWidget = qt.QLineEdit()
+    self.setBSplineGridWidget.setText('14,14,10')
+    self.setBSplineGridWidget.setToolTip("Set the BSpline grid for non linear structural adjustments.")
+
+    #
+    # Initiation Method Area
+    #
+    self.setInitiationRegistrationBooleanWidget = ctk.ctkComboBox()
+    self.setInitiationRegistrationBooleanWidget.addItem("Off")
+    self.setInitiationRegistrationBooleanWidget.addItem("useMomentsAlign")
+    self.setInitiationRegistrationBooleanWidget.addItem("useCenterOfHeadAlign")
+    self.setInitiationRegistrationBooleanWidget.addItem("useGeometryAlign")
+    self.setInitiationRegistrationBooleanWidget.setToolTip(
+        "Initialization method used for the MNI152 registration.")
+
+    #
+    # Cost Metric
+    #
+    self.setRegistrationCostMetricWidget = ctk.ctkComboBox()
+    self.setRegistrationCostMetricWidget.addItem("NC")
+    self.setRegistrationCostMetricWidget.addItem("MMI")
+    self.setRegistrationCostMetricWidget.addItem("MSE")
+    self.setRegistrationCostMetricWidget.setToolTip(
+        "The cost metric to be used during fitting. Defaults to NC. Options are MMI (Mattes Mutual Information), MSE (Mean Square Error), NC"
+        " (Normalized Correlation).")
+
+    #
+    # Interpolation
+    #
+    self.setInterpolationFunctionRegistrationComboBoxWidget = ctk.ctkComboBox()
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("BSpline")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Linear")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("NearestNeighbor")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("WindowedSinc")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Cosine")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Welch")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Lanczos")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Blackman")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Hamming")
+    self.setInterpolationFunctionRegistrationComboBoxWidget.setToolTip(
+        "Interpolation functions for registration step.")
+
+    BRAINSFitParametersLayout.addRow("Percentage Of Samples ", self.setPercSamplingQWidget)
+    BRAINSFitParametersLayout.addRow("Spline Grid ", self.setBSplineGridWidget)
+    BRAINSFitParametersLayout.addRow("Initiation Method ", self.setInitiationRegistrationBooleanWidget)
+    BRAINSFitParametersLayout.addRow("Cost Metric ", self.setRegistrationCostMetricWidget)
+    BRAINSFitParametersLayout.addRow("Interpolation ", self.setInterpolationFunctionRegistrationComboBoxWidget)
+
+    parametersAtlasPropagationLayout.addRow(self.groupBRAINFitParametersBoxButtons)
+
+
 
     #
     # Noise Attenuation Parameters Area
@@ -445,8 +644,23 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
 
   def onApplyButton(self):
     logic = BabyBrainPreparationLogic()
-    # imageModality = self.setImageModalityBooleanWidget.currentText
-    useResampling = self.setApplyImageResamplingBooleanWidget.isChecked()
+    modality = self.setImageModalityBooleanWidget.currentText
+    applyBrainVolumeRefinements = self.setApplyBrainVolumeRefinementBooleanWidget.isChecked()
+    brainAtlas = self.setBrainAtlasComboBoxWidget.currentText
+    age = self.setSubjectAgeIntegerWidget.value
+    if self.setRadioBRAINS.isChecked():
+        registrationAlgorithm = self.setRadioBRAINS.text
+    else:
+        registrationAlgorithm = self.setRadioANTs.text
+    useQuickRegistration = self.setUseANTSQuickBooleanWidget.isChecked()
+    numOfCores = self.setNumberOfCoresWidget.value
+    correlationRadius = self.setCorrelationRadiusWidget.value
+    sampling = self.setPercSamplingQWidget.value
+    splineGrid = self.setBSplineGridWidget.text
+    initMethod = self.setInitiationRegistrationBooleanWidget.currentText
+    costMetric = self.setRegistrationCostMetricWidget.currentText
+    interpolationRegistration = self.setInterpolationFunctionRegistrationComboBoxWidget.currentText
+    # useResampling = self.setApplyImageResamplingBooleanWidget.isChecked()
     useAAD = self.setApplyAADBooleanWidget.isChecked()
     useN4ITK = self.setApplyBiasCorrectionBooleanWidget.isChecked()
     useGlobalContrastEnhancement = self.setApplyGlobalEnhancementBooleanWidget.isChecked()
@@ -472,10 +686,22 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     useFlip = self.setFlipWeightingFunctionBooleanWidget.isChecked()
     logic.run(self.inputSelector.currentNode()
               , self.outputSelector.currentNode()
-              , useResampling
               , useAAD
               , useN4ITK
               , useGlobalContrastEnhancement
+              , modality
+              , applyBrainVolumeRefinements
+              , brainAtlas
+              , age
+              , registrationAlgorithm
+              , useQuickRegistration
+              , numOfCores
+              , correlationRadius
+              , sampling
+              , splineGrid
+              , initMethod
+              , costMetric
+              , interpolationRegistration
               , voxelResampling
               , interpolation
               , applyAutoConductance
@@ -541,10 +767,22 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
   def run(self, inputVolume
           , outputVolume
-          , useResampling
           , useAAD
           , useN4ITK
           , useGlobalContrastEnhancement
+          , modality
+          , applyBrainVolumeRefinements
+          , brainAtlas
+          , age
+          , registrationAlgorithm
+          , useQuickRegistration
+          , numOfCores
+          , correlationRadius
+          , sampling
+          , splineGrid
+          , initMethod
+          , costMetric
+          , interpolationRegistration
           , voxelResampling
           , interpolation
           , applyAutoConductance
@@ -578,83 +816,300 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
     # Copying the input node into the output node in order to apply the changes in the image and not changing the input data
     volumesLogic = slicer.modules.volumes.logic()
-    volumesLogic.CreateScalarVolumeFromVolume(slicer.mrmlScene, outputVolume, inputVolume)
+    # volumesLogic.CreateScalarVolumeFromVolume(slicer.mrmlScene, outputVolume, inputVolume)
+    # clonedInput = volumesLogic.CloneVolume(slicer.mrmlScene, inputVolume, "input_preprocessed")
+
+
 
     # TODO Tentar novamente criar uma barra de progresso : slicer.util.createProgressDialog
     # progressbar = slicer.util.createProgressDialog(parent=slicer.util.mainWindow(),autoClose=False)
 
-    # TODO Verificar se fazer a separacao brainstem+cerebellum do resto pode ser melhor para poder filtrar com o filtro AAD. A imagem enh.nrrd parece q tem distorce as bordas do cerebello...dai fica ruim a segmentao da fossa posterior
 
-    if useResampling:
-        #
-        # Step 1 - Space Resampling
-        #
-        self.imageResamplingResolution(inputVolume
-                                       , outputVolume
-                                       , voxelResampling
-                                       , interpolation)
-        slicer.util.showStatusMessage("Image resampling space is finished...")
+    # if useResampling:
+    #
+    # Step  - Space Resampling
+    #
+    self.imageResamplingResolution(inputVolume
+                                   , outputVolume
+                                   , voxelResampling
+                                   , interpolation)
+    slicer.util.showStatusMessage("Image resampling space is finished...")
     # slicer.app.processEvents()
     # progressbar.value = 20
     # progressbar.labelText = "Space Resampling..."
 
     if useN4ITK:
-        #
-        # Step 2 - Bias field correction - level 1
-        #
-        self.biasFielCorretion(outputVolume
-                               , outputVolume
-                               , maskVolume
-                               , splineGrid_1
-                               , shrinkFactor_1
-                               , useResampling
-                               , voxelResampling)
-        slicer.util.showStatusMessage("Bias field correction (first level) is finished...")
+      #
+      # Step  - Bias field correction - level 1
+      #
+      self.biasFielCorretion(outputVolume
+                             , outputVolume
+                             , maskVolume
+                             , splineGrid_1
+                             , shrinkFactor_1
+                             , True
+                             , voxelResampling)
+      slicer.util.showStatusMessage("Bias field correction (first level) is finished...")
+
+    # Setting the standard paths to extension resources folder
+    modulePath = os.path.dirname(slicer.modules.babybrainsegmentation.path)
+    if platform.system() is "Windows":
+      databasePath = modulePath + "\\Resources\\atlases"
+    else:
+      databasePath = modulePath + "/Resources/atlases"
+
+    # Checking if the age is found in the chosen brain template
+    setAge = age;
+    if brainAtlas == "NEO2012":
+      if age < 27:
+        setAge = 27
+      elif age > 43:
+        setAge = 43
+    elif brainAtlas == "FET2012":
+      if age < 23:
+        setAge = 23
+      elif age > 37:
+        setAge = 37
+
+    ######################################################################################
+    # Step  - Label propagation using brain atlas.
+    ######################################################################################
+    # Reading brain template
+    if platform.system() is "Windows":
+      readingParameters = {}
+      readingParameters['name'] = "brain_template"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
+                                                             "\\" + brainAtlas +
+                                                             "\\templates\\template_" + modality + "_" + str(
+        setAge) + ".nii.gz", readingParameters, True)
+    else:
+      readingParameters = {}
+      readingParameters['name'] = "brain_template"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
+                                                             "/" + brainAtlas +
+                                                             "/templates/template_" + modality + "_" + str(
+        setAge) + ".nii.gz", readingParameters, True)
+
+    ######################################################################################
+    # Step  - Atlas propagation - linear and elastic transformations
+    ######################################################################################
+    # Image registration with atlas - ANTs or BRAINSfit
+    # Creating linear transform node
+    regMNI2NativeLinearTransform = slicer.vtkMRMLLinearTransformNode()
+    regMNI2NativeLinearTransform.SetName("BabyBrain_regMNI2Native_0GenericAffine")
+    slicer.mrmlScene.AddNode(regMNI2NativeLinearTransform)
+
+    regMNI2NativeBSplineTransform = slicer.vtkMRMLBSplineTransformNode()
+    regMNI2NativeBSplineTransform.SetName("BabyBrain_regMNI2Native_1Warp")
+    slicer.mrmlScene.AddNode(regMNI2NativeBSplineTransform)
+
+    self.atlasPropagation(registrationAlgorithm
+                          , outputVolume
+                          , brainAtlasNode
+                          , regMNI2NativeLinearTransform
+                          , regMNI2NativeBSplineTransform
+                          , interpolationRegistration
+                          , sampling
+                          , splineGrid
+                          , initMethod
+                          , numOfCores
+                          , useQuickRegistration)
+
+    if registrationAlgorithm == "ANTs":
+      slicer.mrmlScene.RemoveNode(regMNI2NativeLinearTransform)
+      slicer.mrmlScene.RemoveNode(regMNI2NativeBSplineTransform)
+
+    slicer.util.showStatusMessage("Atlas propagation is finished...")
+
+    ######################################################################################
+    # Step  - Remove Cerebellum and brainstem from the input volume
+    ######################################################################################
+    tmpCerebellumMask = slicer.vtkMRMLLabelMapVolumeNode()
+    tmpCerebellumMask.SetName("cerebellum_mask")
+    slicer.mrmlScene.AddNode(tmpCerebellumMask)
+    # Reading cerebellum volume mask from atlas
+    if platform.system() is "Windows":
+      readingParameters = {}
+      readingParameters['name'] = "cerebellum_template_mask"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = True
+      (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
+                                                                 "\\" + brainAtlas +
+                                                                 "\\cerebellum\\cerebellum_" + str(setAge) + ".nii.gz",
+                                                                 readingParameters,
+                                                                 True)
+    else:
+      readingParameters = {}
+      readingParameters['name'] = "cerebellum_template_mask"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = True
+      (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
+                                                                 "/" + brainAtlas +
+                                                                 "/cerebellum/cerebellum_" + str(setAge) + ".nii.gz",
+                                                                 readingParameters,
+                                                                 True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , cerebellumMaskNode
+                                     , outputVolume
+                                     , tmpCerebellumMask
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , True)
+
+    tmpBrainstemMask = slicer.vtkMRMLLabelMapVolumeNode()
+    tmpBrainstemMask.SetName("brainstem_mask")
+    slicer.mrmlScene.AddNode(tmpBrainstemMask)
+    # Reading brainstem volume mask from atlas
+    if platform.system() is "Windows":
+      readingParameters = {}
+      readingParameters['name'] = "brainstem_template_mask"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = True
+      (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
+                                                                "\\" + brainAtlas +
+                                                                "\\brainstem\\brainstem_" + str(setAge) + ".nii.gz",
+                                                                readingParameters,
+                                                                True)
+    else:
+      readingParameters = {}
+      readingParameters['name'] = "brainstem_template_mask"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = True
+      (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
+                                                                "/" + brainAtlas +
+                                                                "/brainstem/brainstem_" + str(setAge) + ".nii.gz",
+                                                                readingParameters,
+                                                                True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , brainstemMaskNode
+                                     , outputVolume
+                                     , tmpBrainstemMask
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , True)
+
+    # Removing brainstem and cerebellum from the input image
+    inputImage = sitkUtils.PullVolumeFromSlicer(outputVolume)
+    brainstemMaskImage = sitkUtils.PullVolumeFromSlicer(tmpBrainstemMask)
+    brainstemMaskImage = sitk.Cast(brainstemMaskImage, inputImage.GetPixelID())  # This is necessary since the MaskNegated filter requires the same pixel type in both images.
+    cerebellumMaskImage = sitkUtils.PullVolumeFromSlicer(tmpCerebellumMask)
+    cerebellumMaskImage = sitk.Cast(cerebellumMaskImage, inputImage.GetPixelID())  # This is necessary since the MaskNegated filter requires the same pixel type in both images.
+    filter = sitk.MaskNegatedImageFilter()
+    output_brainOnly_Image = filter.Execute(inputImage, brainstemMaskImage)
+    output_brainOnly_Image = filter.Execute(output_brainOnly_Image, cerebellumMaskImage)
+
+    tmpBrainOnlyNode = slicer.vtkMRMLScalarVolumeNode()
+    tmpBrainOnlyNode.SetName("resampled_input_brainOnly")
+    slicer.mrmlScene.AddNode(tmpBrainOnlyNode)
+    sitkUtils.PushVolumeToSlicer(output_brainOnly_Image, tmpBrainOnlyNode)  # TODO Ver como carregar estas labels sem atualizar a scene... nao fica legal ver essas labels intermediarias durante o processamento
+
+    slicer.util.showStatusMessage("Brainstem and cerebellum removal is finished...")
+
+    # Obtaining only the brainstem and cerebellum volume together
+    tmpBrainstemPlusCerebellumLabelOnlyNode = slicer.vtkMRMLLabelMapVolumeNode()
+    tmpBrainstemPlusCerebellumLabelOnlyNode.SetName("resampled_input_BrainstemPlusCerebellumOnly_mask")
+    slicer.mrmlScene.AddNode(tmpBrainstemPlusCerebellumLabelOnlyNode)
+    self.combineLabels(tmpBrainstemMask,tmpCerebellumMask,tmpBrainstemPlusCerebellumLabelOnlyNode)
+
+    inputImage = sitkUtils.PullVolumeFromSlicer(outputVolume)
+    brainstemCerebellumMaskImage = sitkUtils.PullVolumeFromSlicer(tmpBrainstemPlusCerebellumLabelOnlyNode)
+    # brainstemCerebellumMaskImage = sitk.Cast(brainstemCerebellumMaskImage, inputImage.GetPixelID())  # This is necessary since the MaskNegated filter requires the same pixel type in both images.
+    filter = sitk.MaskImageFilter()
+    output_brainstemCerebellumOnly_Image = filter.Execute(inputImage, brainstemCerebellumMaskImage)
+
+    tmpBrainstemCerebellumOnlyNode = slicer.vtkMRMLScalarVolumeNode()
+    tmpBrainstemCerebellumOnlyNode.SetName("resampled_input_BrainstemPlusCerebellumOnly")
+    slicer.mrmlScene.AddNode(tmpBrainstemCerebellumOnlyNode)
+    sitkUtils.PushVolumeToSlicer(output_brainstemCerebellumOnly_Image, tmpBrainstemCerebellumOnlyNode)
+
 
     if useAAD:
-        #
-        # Step 3 - Noise attenuation
-        #
-        self.anisotropicAnomalousDiffusionFilter(outputVolume
-                                                 , outputVolume
-                                                 , numInt
-                                                 , qValue
-                                                 , timeStep
-                                                 , conductance
-                                                 , applyAutoConductance
-                                                 , conductanceFunction
-                                                 , applyConductanceRegularization
-                                                 , conductanceRegularization)
-        slicer.util.showStatusMessage("Image noise attenuation is finished...")
-        # progressbar.value = 40
-        # progressbar.labelText = "Image noise attenuation..."
+      # Applying noise attenuation on Brainstem+Cerebellum image part. Due to small region, the parameters were adjusted following a empirical analysis.
+      #
+      # Step  - Noise attenuation
+      #
+      self.anisotropicAnomalousDiffusionFilter(tmpBrainstemCerebellumOnlyNode
+                                               , tmpBrainstemCerebellumOnlyNode
+                                               , 10
+                                               , 1.2
+                                               , timeStep
+                                               , conductance
+                                               , True
+                                               , "Morphological"
+                                               , True
+                                               , 0.125)
+      slicer.util.showStatusMessage("Image noise attenuation (brainstem+cerebellum region) is finished...")
+
+      # Applying noise attenuation on brain image part
+      #
+      # Step  - Noise attenuation
+      #
+      self.anisotropicAnomalousDiffusionFilter(tmpBrainOnlyNode
+                                               , tmpBrainOnlyNode
+                                               , numInt
+                                               , qValue
+                                               , timeStep
+                                               , conductance
+                                               , applyAutoConductance
+                                               , conductanceFunction
+                                               , applyConductanceRegularization
+                                               , conductanceRegularization)
+      slicer.util.showStatusMessage("Image noise attenuation (brain hemispheres region) is finished...")
+      # progressbar.value = 40
+      # progressbar.labelText = "Image noise attenuation..."
 
     if useN4ITK:
-        #
-        # Step  - Bias field correction - level 2
-        #
-        self.biasFielCorretion(outputVolume
-                               , outputVolume
-                               , maskVolume
-                               , splineGrid_2
-                               , shrinkFactor_2
-                               , useResampling
-                               , voxelResampling)
-        slicer.util.showStatusMessage("Bias field correction (second level) is finished...")
+      #
+      # Step  - Bias field correction - level 2 - Brainstem+Cerebellum
+      #
+      self.biasFielCorretion(tmpBrainstemCerebellumOnlyNode
+                             , tmpBrainstemCerebellumOnlyNode
+                             , tmpBrainstemPlusCerebellumLabelOnlyNode
+                             , splineGrid_2
+                             , shrinkFactor_2
+                             , True
+                             , voxelResampling)
+      slicer.util.showStatusMessage("Bias field correction (second level for brainstem and cerebellum regions) is finished...")
+
+      #
+      # Step  - Bias field correction - level 2 - Brain hemispheres
+      #
+      self.biasFielCorretion(tmpBrainOnlyNode
+                             , tmpBrainOnlyNode
+                             , maskVolume
+                             , splineGrid_2
+                             , shrinkFactor_2
+                             , True
+                             , voxelResampling)
+      slicer.util.showStatusMessage(
+          "Bias field correction (second level for brain hemispheres regions) is finished...")
+
+    # Adding both parts to the same volume
+    self.addVolumesTogether(tmpBrainOnlyNode, tmpBrainstemCerebellumOnlyNode, outputVolume)
 
     if useGlobalContrastEnhancement:
-        #
-        # Step  - Global image contrast enhancement
-        #
-        self.imageGlobalConstrastEnhancement(outputVolume
-                                       , outputVolume
-                                       , globalContrastEnhancement
-                                       , lowerCut
-                                       , higherCut
-                                       , maxWeight
-                                       , minWeight
-                                       , useFlip)
-        slicer.util.showStatusMessage("Global contrast enhancement is finished...")
+      #
+      # Step  - Global image contrast enhancement
+      #
+      self.imageGlobalConstrastEnhancement(outputVolume
+                                     , outputVolume
+                                     , globalContrastEnhancement
+                                     , lowerCut
+                                     , higherCut
+                                     , maxWeight
+                                     , minWeight
+                                     , useFlip)
+      slicer.util.showStatusMessage("Global contrast enhancement is finished...")
 
     # progressbar.value = 100
     # slicer.app.processEvents()
@@ -663,7 +1118,165 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     logging.info('Processing completed')
     slicer.util.showStatusMessage("Baby Brain Preparation is finished!")
 
+    ######################################################################################
+    # Step  - Cleaning temporaty data (Debug mode: Off)
+    ######################################################################################
+    slicer.mrmlScene.RemoveNode(brainAtlasNode)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+
+
+    home = expanduser("~")
+    tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
+    os.system("rm -R " + tmpFolder)
+
     return True
+
+  #
+  # Atlas Propagation
+  #
+  def atlasPropagation(self, registrationAlgorithm
+                       , fixedNode
+                       , movingNode
+                       , transformLinear
+                       , transformElastic
+                       , interpolation
+                       , sampling
+                       , splineGrid
+                       , initMethod
+                       , numberOfCores
+                       , useQuickRegistration):
+
+    if registrationAlgorithm == "BRAINSFit":
+      # Applying the first registration level - Linear (Affine)
+      regParams = {}
+      regParams["fixedVolume"] = fixedNode.GetID()
+      regParams["movingVolume"] = movingNode.GetID()
+      regParams["outputVolume"] = movingNode.GetID()
+      regParams["samplingPercentage"] = sampling
+      regParams["linearTransform"] = transformLinear.GetID()
+      regParams["initializeTransformMode"] = initMethod
+      regParams["useRigid"] = True
+      regParams["useAffine"] = True
+      regParams["interpolationMode"] = interpolation
+
+      slicer.cli.run(slicer.modules.brainsfit, None, regParams, wait_for_completion=True)
+
+      # Applying the second registration level - Elastic (Spline)
+      regParams = {}
+      regParams["fixedVolume"] = fixedNode.GetID()
+      regParams["movingVolume"] = movingNode.GetID()
+      regParams["samplingPercentage"] = sampling
+      regParams["bsplineTransform"] = transformElastic.GetID()
+      # regParams['initialTransform'] = transformLinear.GetID()
+      regParams["initializeTransformMode"] = "Off"
+      regParams["splineGridSize"] = splineGrid
+      regParams["useBSpline"] = True
+      regParams["interpolationMode"] = interpolation
+
+      slicer.cli.run(slicer.modules.brainsfit, None, regParams, wait_for_completion=True)
+    else:
+      # Create scripts calling. Since the ANTs tools are only provided to Unix systems, the path pattern is fixed.
+      home = expanduser("~")
+      # Creating temporary folder in home directory
+      os.system("mkdir " + home + "/tmpANTsBabyBrainSegmentation")
+      tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
+
+      # Saving the subject image
+      slicer.util.saveNode(fixedNode, tmpFolder + '/subject.nii.gz')
+      # Saving the brain template
+      slicer.util.saveNode(movingNode, tmpFolder + '/template.nii.gz')
+
+      # Use ANTs registration
+      if useQuickRegistration:
+        os.system(
+          "antsRegistrationSyNQuick.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder + "/BabyBrain_regMNI2Native_ -n " + str(
+            numberOfCores))
+      else:
+        os.system(
+          "antsRegistrationSyN.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder + "/BabyBrain_regMNI2Native_ -n " + str(
+            numberOfCores))
+
+      # Reading registration tranforms
+      (read, regTemplate1Warp) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_1Warp.nii.gz', True)
+      regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp")  # brain template to native space (SyN)
+      (read, regTemplate0GenericAffine) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_0GenericAffine.mat', True)
+      regTemplate0GenericAffine.SetName("BabyBrain_regMNI2Native_0GenericAffine")  # brain template to native space (affine)
+
+      # Removing files from the modules path
+      # os.system("rm -R " + tmpFolder)
+
+  #
+  # Registration Transform Application
+  #
+  def applyRegistrationTransforms(self, registrationAlgorithm
+                                  , inputVolume
+                                  , referenceVolume
+                                  , outputVolume
+                                  , transformLinear
+                                  , transformWarp
+                                  , isLabel):
+
+    params = {}
+    params["inputVolume"] = inputVolume.GetID()
+    params["referenceVolume"] = referenceVolume.GetID()
+    params["outputVolume"] = outputVolume.GetID()
+    params["warpTransform"] = transformLinear.GetID()
+    params["inverseTransform"] = False
+    if isLabel:
+      params["interpolationMode"] = "NearestNeighbor"
+      params["pixelType"] = "binary"
+    else:
+      params["interpolationMode"] = "BSpline"
+      params["pixelType"] = "float"
+
+    slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+
+    params = {}
+    params["inputVolume"] = outputVolume.GetID()
+    params["referenceVolume"] = inputVolume.GetID()
+    params["outputVolume"] = outputVolume.GetID()
+    params["warpTransform"] = transformWarp.GetID()
+    params["inverseTransform"] = False
+    if isLabel:
+      params["interpolationMode"] = "NearestNeighbor"
+      params["pixelType"] = "binary"
+    else:
+      params["interpolationMode"] = "BSpline"
+      params["pixelType"] = "float"
+
+    slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+
+  #
+  # Combine Labels
+  #
+  def combineLabels(self, firstLabel
+                    , secondLabel
+                    , outputLabel
+                    , firstOverwrites=True):
+
+    params = {}
+    params['InputLabelMap_A'] = firstLabel
+    params['InputLabelMap_B'] = secondLabel
+    params['OutputLabelMap'] = outputLabel
+    params['FirstOverwrites'] = firstOverwrites
+
+    slicer.cli.run(slicer.modules.imagelabelcombine, None, params, wait_for_completion=True)
+
+  #
+  # Add Volumes
+  #
+  def addVolumesTogether(self, volume1Node, volume2Node, outputNode, order=0):
+    params = {}
+    params['inputVolume1'] = volume1Node
+    params['inputVolume2'] = volume2Node
+    params['outputVolume'] = outputNode
+    params['order'] = order
+
+    slicer.cli.run(slicer.modules.addscalarvolumes, None, params, wait_for_completion=True)
 
   #
   # Image Resampling Resolution
@@ -721,11 +1334,10 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     params = {}
     params["inputVolume"] = inputNode.GetID()
     params["outputVolume"] = outputNode.GetID()
-    params["useAutoConductance"] = useAutoConductance
-    params["conductanceFunction"] = conductanceFunction
     params["useConductanceRegularization"] = useConductanceRegularization
     params["kappaRegFactor"] = conductanceRegularization
-    params["optFunction"] = "Canny"
+    params["useAutoConductance"] = useAutoConductance
+    params["optFunction"] = conductanceFunction
     params["iterations"] = numberOfIterations
     params["conductance"] = conductance
     params["q"] = qValue

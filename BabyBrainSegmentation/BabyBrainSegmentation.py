@@ -115,16 +115,16 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
                                             self.setUseBasalGangliaEstimatorBooleanWidget)
 
 
-    #
-    # Debug Mode
-    #
-    self.setUseDebugModeBooleanWidget = ctk.ctkCheckBox()
-    self.setUseDebugModeBooleanWidget.setChecked(False)
-    self.setUseDebugModeBooleanWidget.setToolTip(
-      "Check this if you want to keep the intermediate files generated through the segmentation process. This could be"
-      "useful if you want to check each brain structure labels in a separated manner.")
-    parametersFormLayout.addRow("Debug Mode",
-                                            self.setUseDebugModeBooleanWidget)
+    # #
+    # # Debug Mode
+    # #
+    # self.setUseDebugModeBooleanWidget = ctk.ctkCheckBox()
+    # self.setUseDebugModeBooleanWidget.setChecked(False)
+    # self.setUseDebugModeBooleanWidget.setToolTip(
+    #   "Check this if you want to keep the intermediate files generated through the segmentation process. This could be"
+    #   "useful if you want to check each brain structure labels in a separated manner.")
+    # parametersFormLayout.addRow("Debug Mode",
+    #                                         self.setUseDebugModeBooleanWidget)
 
     #
     # Atlas Propagation Parameters Area
@@ -409,7 +409,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     logic = BabyBrainSegmentationLogic()
     modality = self.setImageModalityBooleanWidget.currentText
     estimateBasalGanglia = self.setUseBasalGangliaEstimatorBooleanWidget.isChecked()
-    debugMode = self.setUseDebugModeBooleanWidget.isChecked()
+    # debugMode = self.setUseDebugModeBooleanWidget.isChecked()
     applyBrainVolumeRefinements = self.setApplyBrainVolumeRefinementBooleanWidget.isChecked()
     brainAtlas = self.setBrainAtlasComboBoxWidget.currentText
     age = self.setSubjectAgeIntegerWidget.value
@@ -433,7 +433,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
               , self.brainTissuesSelector.currentNode()
               , modality
               , estimateBasalGanglia
-              , debugMode
+              # , debugMode
               , applyBrainVolumeRefinements
               , brainAtlas
               , age
@@ -497,7 +497,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
           , outputVolume
           , modality
           , estimateBasalGanglia
-          , debugMode
+          # , debugMode
           , applyBrainVolumeRefinements
           , brainAtlas
           , age
@@ -562,9 +562,13 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
             setAge = 37
 
     # This will check is already exist the registration transformation in the Slicer scene, using the generic names of it.
-    # If those exist, the atlas propagation step is jumped.
+    # If those exist, the most recent one is adopted as the correct template transformations to the input data.
+    # This strategy is useful if the user used the BabyBrainPrepation module, because the registration transformation
+    # generated there are recycled here.
     jumpedAtlasPropagation = False
-    if slicer.util.getNode('regMNI2Native_0GenericAffine') is None and slicer.util.getNode('regMNI2Native_1Warp') is None:
+    regAffine=slicer.util.getNodes('BabyBrain_regMNI2Native_0GenericAffine')
+    regWarp=slicer.util.getNodes('BabyBrain_regMNI2Native_1Warp')
+    if regAffine.get('BabyBrain_regMNI2Native_0GenericAffine') is None and regWarp.get('BabyBrain_regMNI2Native_1Warp') is None:
         jumpedAtlasPropagation = True
         ######################################################################################
         # Step  - Label propagation using brain atlas.
@@ -588,16 +592,16 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                                                  "/templates/template_" + modality + "_" + str(setAge) + ".nii.gz", readingParameters, True)
 
         ######################################################################################
-        # Step  - Atlas propagation step - linear and elastic transformations
+        # Step  - Atlas propagation - linear and elastic transformations
         ######################################################################################
         # Image registration with atlas - ANTs or BRAINSfit
         # Creating linear transform node
         regMNI2NativeLinearTransform = slicer.vtkMRMLLinearTransformNode()
-        regMNI2NativeLinearTransform.SetName("regMNI2Native_0GenericAffine")
+        regMNI2NativeLinearTransform.SetName("BabyBrain_regMNI2Native_0GenericAffine")
         slicer.mrmlScene.AddNode(regMNI2NativeLinearTransform)
 
         regMNI2NativeBSplineTransform = slicer.vtkMRMLBSplineTransformNode()
-        regMNI2NativeBSplineTransform.SetName("regMNI2Native_1Warp")
+        regMNI2NativeBSplineTransform.SetName("BabyBrain_regMNI2Native_1Warp")
         slicer.mrmlScene.AddNode(regMNI2NativeBSplineTransform)
 
 
@@ -662,8 +666,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                        , brainMaskNode
                                        , tmpResampledInputNode
                                        , tmpBrainMask
-                                       , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                       , slicer.util.getNode("regMNI2Native_1Warp")
+                                       , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                       , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                        , True)
 
       # Applying brain volume correction
@@ -712,8 +716,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , cerebellumMaskNode
                                      , tmpResampledInputNode
                                      , tmpCerebellumMask
-                                     , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("regMNI2Native_1Warp")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
 
     tmpBrainstemMask = slicer.vtkMRMLLabelMapVolumeNode()
@@ -745,8 +749,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , brainstemMaskNode
                                      , tmpResampledInputNode
                                      , tmpBrainstemMask
-                                     , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("regMNI2Native_1Warp")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
 
     # Removing brainstem and cerebellum from the input image
@@ -880,8 +884,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , hemispheresMaskNode
                                      , tmpResampledInputNode
                                      , tmpHemispheresLabelMask
-                                     , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("regMNI2Native_1Warp")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
     slicer.util.showStatusMessage("Brain hemispheres space definition is finished...")
 
@@ -918,8 +922,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , venctriculesMaskNode
                                      , tmpResampledInputNode
                                      , tmpVentriculesLabelMask
-                                     , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("regMNI2Native_1Warp")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
 
     # Adjusting the brain hemispheres labels, taking care to ventricules being set to value 10
@@ -1008,8 +1012,8 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                        , dgmMaskNode
                                        , tmpResampledInputNode
                                        , tmpDeepGMLabelMask
-                                       , slicer.util.getNode("regMNI2Native_0GenericAffine")
-                                       , slicer.util.getNode("regMNI2Native_1Warp")
+                                       , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                       , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                        , True)
 
       self.combineLabels(tmpDeepGMLabelMask, outputVolume, outputVolume)
@@ -1027,36 +1031,36 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True) # TODO Verificar se o median filter eh dado em voxel ou em mm
       slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
 
-    if not debugMode:
-      ######################################################################################
-      # Step  - Cleaning temporaty data (Debug mode: Off)
-      ######################################################################################
-      if jumpedAtlasPropagation:
-        slicer.mrmlScene.RemoveNode(brainAtlasNode)
+    # if not debugMode: # TODO Remover ou nao o debug mode no modulo...???
+    ######################################################################################
+    # Step  - Cleaning temporaty data (Debug mode: Off)
+    ######################################################################################
+    if jumpedAtlasPropagation:
+      slicer.mrmlScene.RemoveNode(brainAtlasNode)
 
-      slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
-      slicer.mrmlScene.RemoveNode(brainMaskNode)
-      slicer.mrmlScene.RemoveNode(tmpBrainMask)
-      slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
-      slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
-      slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
-      slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
-      slicer.mrmlScene.RemoveNode(brainstemMaskNode)
-      slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
-      slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
-      slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
-      slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
-      slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
-      slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
-      slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
-      slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
-      slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
-      slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
-      slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
-      slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
+    slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
+    slicer.mrmlScene.RemoveNode(brainMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainMask)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
+    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
+    slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
+    slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
+    slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
+    slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
 
-      if estimateBasalGanglia:
-        slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
+    if estimateBasalGanglia:
+      slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
 
     logging.info('Processing completed')
     slicer.util.showStatusMessage("Baby Brain Segmentation is finished")
@@ -1120,15 +1124,15 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
 
       # Use ANTs registration
       if useQuickRegistration:
-        os.system("antsRegistrationSyNQuick.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder +"/regMNI2Native_ -n " + str(numberOfCores))
+        os.system("antsRegistrationSyNQuick.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder +"/BabyBrain_regMNI2Native_ -n " + str(numberOfCores))
       else:
-        os.system("antsRegistrationSyN.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder +"/regMNI2Native_ -n " + str(numberOfCores))
+        os.system("antsRegistrationSyN.sh -d 3 -f " + tmpFolder + "/subject.nii.gz -m " + tmpFolder + "/template.nii.gz -o " + tmpFolder +"/BabyBrain_regMNI2Native_ -n " + str(numberOfCores))
 
       # Reading registration tranforms
-      (read, regTemplate1Warp) = slicer.util.loadTransform(tmpFolder + '/regMNI2Native_1Warp.nii.gz', True) # TODO Acertar a leitura das transformadas para nao depender somente do nome... do jeito que ta o modulo nao pode rodar duas vezes seguidas...
-      regTemplate1Warp.SetName("regMNI2Native_1Warp") # brain template to native space (SyN)
-      (read, regTemplate0GenericAffine) = slicer.util.loadTransform(tmpFolder + '/regMNI2Native_0GenericAffine.mat', True)
-      regTemplate0GenericAffine.SetName("regMNI2Native_0GenericAffine")# brain template to native space (affine)
+      (read, regTemplate1Warp) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_1Warp.nii.gz', True) # TODO Acertar a leitura das transformadas para nao depender somente do nome... do jeito que ta o modulo nao pode rodar duas vezes seguidas...
+      regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp") # brain template to native space (SyN)
+      (read, regTemplate0GenericAffine) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_0GenericAffine.mat', True)
+      regTemplate0GenericAffine.SetName("BabyBrain_regMNI2Native_0GenericAffine")# brain template to native space (affine)
 
       # Removing files from the modules path
       os.system("rm -R " + tmpFolder)

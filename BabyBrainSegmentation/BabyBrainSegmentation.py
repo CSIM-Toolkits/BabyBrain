@@ -540,6 +540,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     # 1) Usar transformadas faz com que o atlas propagation pule corretamente
     # 2)
 
+    #  TODO Fazer um checkup pra ver se este color table ja foi carregado no slicer...assim nao carrega duas vezes
     # Loading BabyBrain color table
     if platform.system() is "Windows":
       slicer.util.loadColorTable(modulePath + "\\Resources\\2018_USP_BabyBrain.ctbl")
@@ -581,7 +582,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
           readingParameters['show'] = False
           (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
                                                                  "\\" + brainAtlas +
-                                                                 "\\templates\\template_" + modality + "_" + str(setAge) +".nii.gz", readingParameters, True)
+                                                                 "\\templates\\template_" + modality + "_" + str(int(setAge)) +".nii.gz", readingParameters, True)
         else:
           readingParameters = {}
           readingParameters['name'] = "brain_template"
@@ -589,7 +590,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
           readingParameters['show'] = False
           (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
                                                                  "/" + brainAtlas +
-                                                                 "/templates/template_" + modality + "_" + str(setAge) + ".nii.gz", readingParameters, True)
+                                                                 "/templates/template_" + modality + "_" + str(int(setAge)) + ".nii.gz", readingParameters, True)
 
         ######################################################################################
         # Step  - Atlas propagation - linear and elastic transformations
@@ -621,6 +622,18 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
           slicer.mrmlScene.RemoveNode(regMNI2NativeLinearTransform)
           slicer.mrmlScene.RemoveNode(regMNI2NativeBSplineTransform)
 
+    # Allocating the default path in order to save temporary files into the hard drive
+    home = expanduser("~") # TODO colocar home para windows tambem ... expanduser(%USERPROFILE%) algo assim...
+    tmpFolder=home
+    # Creating temporary folder in home directory
+    if registrationAlgorithm == "ANTs":
+        tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
+    else:
+        tmpFolder = home + "/tmpBRAINSFitBabyBrainSegmentation" # TODO Colocar uma pasta temporaria para o BRAINSFit tambem!! fazer com isso seja o output geral da extensao, que o usuario pode querer salvar se quiser!!! (Debug mode foi parecido com isso!!)
+
+
+
+
     slicer.util.showStatusMessage("Atlas propagation is finished...")
     ######################################################################################
     # Step  - Resampling the input volume
@@ -634,7 +647,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                    , interpolationResampling)
     slicer.util.showStatusMessage("Image resampling to voxel resolution of [" + str(voxelResampling) + "] is finished...")
 
-    # Applying a brain volume refinement using atlas brain mask (if required)
+    # Applying a brain volume refinement using atlas brain mask (if required) # TODO Melhorar este brain volume correction... pensar em como reduzir os erros do BET aqui...criar um cli especfico para isto
     if applyBrainVolumeRefinements:
       # Reading brain volume mask from atlas
       if platform.system() is "Windows":
@@ -645,7 +658,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
         readingParameters['labelmap'] = True
         (readSuccess, brainMaskNode) = slicer.util.loadVolume(databasePath +
                                                                "\\" + brainAtlas +
-                                                               "\\brainmask\\brainmask_" + str(setAge) + ".nii.gz", readingParameters,
+                                                               "\\brainmask\\brainmask_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                True)
       else:
         readingParameters = {}
@@ -655,7 +668,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
         readingParameters['labelmap'] = True
         (readSuccess, brainMaskNode) = slicer.util.loadVolume(databasePath +
                                                                "/" + brainAtlas +
-                                                               "/brainmask/brainmask_" + str(setAge) + ".nii.gz", readingParameters,
+                                                               "/brainmask/brainmask_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                True)
 
       # Transforming brain mask to native space
@@ -687,6 +700,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     ######################################################################################
     # Step  - Remove Cerebellum and brainstem from the input volume
     ######################################################################################
+    # Reading the cerebellum region from atlas and adjusting to native space
     tmpCerebellumMask = slicer.vtkMRMLLabelMapVolumeNode()
     tmpCerebellumMask.SetName("cerebellum_mask")
     slicer.mrmlScene.AddNode(tmpCerebellumMask)
@@ -699,7 +713,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
                                                             "\\" + brainAtlas +
-                                                            "\\cerebellum\\cerebellum_" + str(setAge) + ".nii.gz", readingParameters,
+                                                            "\\cerebellum\\cerebellum_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                             True)
     else:
       readingParameters = {}
@@ -709,7 +723,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
                                                             "/" + brainAtlas +
-                                                            "/cerebellum/cerebellum_" + str(setAge) + ".nii.gz", readingParameters,
+                                                            "/cerebellum/cerebellum_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                             True)
 
     self.applyRegistrationTransforms(registrationAlgorithm
@@ -720,6 +734,45 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
 
+    # Reading the cerebellum prior probability and adjusting to native space
+    tmpCerebellumPriors = slicer.vtkMRMLScalarVolumeNode()
+    tmpCerebellumPriors.SetName("cerebellum_priors")
+    slicer.mrmlScene.AddNode(tmpCerebellumPriors)
+    # Reading cerebellum volume mask from atlas
+    if platform.system() is "Windows":
+        readingParameters = {}
+        readingParameters['name'] = "cerebellum_template_priors"
+        readingParameters['center'] = True
+        readingParameters['show'] = False
+        readingParameters['labelmap'] = False
+        (readSuccess, cerebellumPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                   "\\" + brainAtlas +
+                                                                   "\\cerebellum\\cerebellum_prob_" + str(int(setAge)) + ".nii.gz", readingParameters,
+                                                                   True)
+    else:
+        readingParameters = {}
+        readingParameters['name'] = "cerebellum_template_priors"
+        readingParameters['center'] = True
+        readingParameters['show'] = False
+        readingParameters['labelmap'] = False
+        (readSuccess, cerebellumPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                   "/" + brainAtlas +
+                                                                   "/cerebellum/cerebellum_prob_" + str(int(setAge)) + ".nii.gz", readingParameters,
+                                                                   True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , cerebellumPriorsNode
+                                     , tmpResampledInputNode
+                                     , tmpCerebellumPriors
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , False)
+
+    # Saving the cerebellum priors image
+    slicer.util.saveNode(tmpCerebellumPriors, tmpFolder + '/cerebellum_priors.nii.gz')
+
+
+    # Reading the brainstem region from atlas and adjusting to native space
     tmpBrainstemMask = slicer.vtkMRMLLabelMapVolumeNode()
     tmpBrainstemMask.SetName("brainstem_mask")
     slicer.mrmlScene.AddNode(tmpBrainstemMask)
@@ -732,7 +785,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
                                                                  "\\" + brainAtlas +
-                                                                 "\\brainstem\\brainstem_" + str(setAge) + ".nii.gz", readingParameters,
+                                                                 "\\brainstem\\brainstem_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                  True)
     else:
       readingParameters = {}
@@ -742,7 +795,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
                                                                  "/" + brainAtlas +
-                                                                 "/brainstem/brainstem_" + str(setAge) + ".nii.gz", readingParameters,
+                                                                 "/brainstem/brainstem_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                  True)
 
     self.applyRegistrationTransforms(registrationAlgorithm
@@ -752,6 +805,44 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                                      , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
                                      , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
                                      , True)
+
+    # Reading the brainstem priors and adjusting to native space
+    tmpBrainstemPriors = slicer.vtkMRMLScalarVolumeNode()
+    tmpBrainstemPriors.SetName("brainstem_priors")
+    slicer.mrmlScene.AddNode(tmpBrainstemPriors)
+    # Reading brainstem volume mask from atlas
+    if platform.system() is "Windows":
+        readingParameters = {}
+        readingParameters['name'] = "brainstem_template_priors"
+        readingParameters['center'] = True
+        readingParameters['show'] = False
+        readingParameters['labelmap'] = False
+        (readSuccess, brainstemPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                  "\\" + brainAtlas +
+                                                                  "\\brainstem\\brainstem_prob_" + str(int(setAge)) + ".nii.gz", readingParameters,
+                                                                  True)
+    else:
+        readingParameters = {}
+        readingParameters['name'] = "brainstem_template_priors"
+        readingParameters['center'] = True
+        readingParameters['show'] = False
+        readingParameters['labelmap'] = False
+        (readSuccess, brainstemPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                  "/" + brainAtlas +
+                                                                  "/brainstem/brainstem_prob_" + str(int(setAge)) + ".nii.gz", readingParameters,
+                                                                  True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , brainstemPriorsNode
+                                     , tmpResampledInputNode
+                                     , tmpBrainstemPriors
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , False)
+
+    # Saving the brainstem priors image
+    slicer.util.saveNode(tmpBrainstemPriors, tmpFolder + '/brainstem_priors.nii.gz')
+
 
     # Removing brainstem and cerebellum from the input image
     inputImage = sitkUtils.PullVolumeFromSlicer(tmpResampledInputNode)
@@ -793,10 +884,12 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     if modality == 'T1':
       definitions = [3,5]
 
+    path2CerebellumPriors=tmpFolder + '/cerebellum_priors.nii.gz' # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
     self.segmentingTissues(tmpCerebellumOnlyVolumeNode
                            , modality
                            , 3
                            , cerebellumOnlyLabelMask
+                           , inputPriorsFile=path2CerebellumPriors
                            , definitions=definitions ) # Cerebellum and CSF
 
     # Brainstem
@@ -819,10 +912,12 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     if modality == 'T1':
       definitions = [3,4]
 
+    path2BrainstemPriors = tmpFolder + '/brainstem_priors.nii.gz'
     self.segmentingTissues(tmpBrainstemOnlyVolumeNode
                            , modality
                            , 3
                            , brainstemOnlyLabelMask
+                           , inputPriorsFile=path2BrainstemPriors
                            , definitions=definitions) # Brainstem and CSF
 
     # Merging both labels into one
@@ -833,234 +928,237 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
 
     slicer.util.showStatusMessage("Brainstem and cerebellum segmentation is finished...")
 
-    ######################################################################################
-    # Step  - Brain tissue segmentation (only brain)
-    ######################################################################################
-    brainOnlyLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    brainOnlyLabelMask.SetName("brainOnly_tissues_mask")
-    slicer.mrmlScene.AddNode(brainOnlyLabelMask)
+    # ######################################################################################
+    # # Step  - Brain tissue segmentation (only brain)
+    # ######################################################################################
+    # brainOnlyLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    # brainOnlyLabelMask.SetName("brainOnly_tissues_mask")
+    # slicer.mrmlScene.AddNode(brainOnlyLabelMask)
+    #
+    # definitions = [1,2,3]
+    # if modality == 'T1':
+    #   definitions = [3,2,1]
+    #
+    # self.segmentingTissues(tmpBrainOnlyNode
+    #                        , modality
+    #                        , 4
+    #                        , brainOnlyLabelMask
+    #                        , definitions=definitions)
+    # slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...")
+    #
+    # ######################################################################################
+    # # Step  - Smoothing brain segmentation by median filtering
+    # ######################################################################################
+    # for i in range(0, interations):
+    #   params = {}
+    #   params['neighborhood'] = neighborSize
+    #   params['inputVolume'] = brainOnlyLabelMask
+    #   params['outputVolume'] = brainOnlyLabelMask
+    #
+    #   slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
+    #   slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
+    #
 
-    definitions = [1,2,3]
-    if modality == 'T1':
-      definitions = [3,2,1]
+    #
+    # ######################################################################################
+    # # Step  - Split brain hemispheres (only adjust the mask on the native space)
+    # ######################################################################################
+    # # Reading brain hemispheres mask from atlas
+    # if platform.system() is "Windows":
+    #   readingParameters = {}
+    #   readingParameters['name'] = "hemisphere_template_mask"
+    #   readingParameters['center'] = True
+    #   readingParameters['show'] = False
+    #   readingParameters['labelmap'] = True
+    #   (readSuccess, hemispheresMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                              "\\" + brainAtlas +
+    #                                                              "\\hemispheres.nii.gz", readingParameters,
+    #                                                              True)
+    # else:
+    #   readingParameters = {}
+    #   readingParameters['name'] = "hemisphere_template_mask"
+    #   readingParameters['center'] = True
+    #   readingParameters['show'] = False
+    #   readingParameters['labelmap'] = True
+    #   (readSuccess, hemispheresMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                              "/" + brainAtlas +
+    #                                                              "/hemispheres.nii.gz", readingParameters,
+    #                                                              True)
+    #
+    # # Transforming the hemispheres mask to native space
+    # tmpHemispheresLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    # tmpHemispheresLabelMask.SetName("tmpHemispheres_mask")
+    # slicer.mrmlScene.AddNode(tmpHemispheresLabelMask)
+    # self.applyRegistrationTransforms(registrationAlgorithm
+    #                                  , hemispheresMaskNode
+    #                                  , tmpResampledInputNode
+    #                                  , tmpHemispheresLabelMask
+    #                                  , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+    #                                  , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+    #                                  , True)
+    # slicer.util.showStatusMessage("Brain hemispheres space definition is finished...")
+    #
+    # ######################################################################################
+    # # Step  - Setting up the brain hemispheres value (white matter, gray matter and ventricules)
+    # ######################################################################################
+    # # Reading brain hemispheres mask from atlas
+    # if platform.system() is "Windows":
+    #     readingParameters = {}
+    #     readingParameters['name'] = "ventricules_template_mask"
+    #     readingParameters['center'] = True
+    #     readingParameters['show'] = False
+    #     readingParameters['labelmap'] = True
+    #     (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                                 "\\" + brainAtlas +
+    #                                                                 "\\ventricules\\ventricules_" + str(int(setAge)) + ".nii.gz", readingParameters,
+    #                                                                 True)
+    # else:
+    #     readingParameters = {}
+    #     readingParameters['name'] = "ventricules_template_mask"
+    #     readingParameters['center'] = True
+    #     readingParameters['show'] = False
+    #     readingParameters['labelmap'] = True
+    #     (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                                 "/" + brainAtlas +
+    #                                                                 "/ventricules/ventricules_" + str(int(setAge)) + ".nii.gz", readingParameters,
+    #                                                                 True)
+    #
+    # # Transforming the hemispheres mask to native space
+    # tmpVentriculesLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    # tmpVentriculesLabelMask.SetName("tmpVentricules_mask")
+    # slicer.mrmlScene.AddNode(tmpVentriculesLabelMask)
+    # self.applyRegistrationTransforms(registrationAlgorithm
+    #                                  , venctriculesMaskNode
+    #                                  , tmpResampledInputNode
+    #                                  , tmpVentriculesLabelMask
+    #                                  , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+    #                                  , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+    #                                  , True)
+    #
+    # # Adjusting the brain hemispheres labels, taking care to ventricules being set to value 10
+    # brainOnlyHemispheresLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    # brainOnlyHemispheresLabelMask.SetName("brain_hemispheres_tissue_mask")
+    # slicer.mrmlScene.AddNode(brainOnlyHemispheresLabelMask)
+    # params = {}
+    # params['inputLabel'] = brainOnlyLabelMask.GetID()
+    # params['splitLabel'] = tmpVentriculesLabelMask.GetID()
+    # params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID() # TODO Verificar se ao inves de marcar os ventriculos apenas pelos labels, fazer a segmentacao novamente pode ser melhor. O cerebro pode ja vir filtrado com median filter e os ventriculos sao resegmentados...
+    # if modality == "T1":
+    #     params['labelSideA'] = 9
+    # else:
+    #     params['labelSideA'] = 7
+    # params['labelSideB'] = 0
+    # params['doKeepSomeValues'] = True
+    # if modality == 'T1':
+    #     params['keepSideA'] = "2,3"
+    #     params['keepSideB'] = "1,2,3"
+    # else:
+    #     params['keepSideA'] = "1,2"
+    #     params['keepSideB'] = "1,2,3"
+    #
+    # slicer.cli.run(slicer.modules.splitlabelvalues, None, params, wait_for_completion=True)
+    # slicer.util.showStatusMessage("Brain hemispheres detection and separation is finished...")
+    #
+    # # Adjusting the brain hemispheres globally, i.e. right-left white, gray and ventricules. CSF is constant regardless laterality
+    # params = {}
+    # params['inputLabel'] = brainOnlyHemispheresLabelMask.GetID()
+    # params['splitLabel'] = tmpHemispheresLabelMask.GetID()
+    # params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID()
+    # params['labelSideA'] = 20
+    # params['labelSideB'] = 40
+    # params['doKeepSomeValues'] = True  # This will maintain the CSF intact
+    # csf = 3
+    # if modality == 'T1':
+    #   csf = 1
+    # params['keepSideA'] = csf
+    # params['keepSideB'] = csf
+    #
+    # slicer.cli.run(slicer.modules.splitlabelvalues, None, params, wait_for_completion=True)
+    #
+    # slicer.util.showStatusMessage("Ventricules detection and separation is finished...")
+    #
+    # ######################################################################################
+    # # Step  - Merging brainstem, cerebellum and brain hemispheres all the tissues together
+    # ######################################################################################
+    # fullBrainSegmentationLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    # fullBrainSegmentationLabelMask.SetName("full_brain_tissues_mask")
+    # slicer.mrmlScene.AddNode(fullBrainSegmentationLabelMask)
+    # self.combineLabels(brainOnlyHemispheresLabelMask, brainstemPlusCerebellumLabelMask, outputVolume)
+    #
+    # slicer.util.showStatusMessage("Brain parcellation is finished...")
+    #
+    # if estimateBasalGanglia:
+    #   ######################################################################################
+    #   # Step  - Merging basal ganglia to other labels all the tissues together
+    #   ######################################################################################
+    #   # Reading brain hemispheres mask from atlas
+    #   if platform.system() is "Windows":
+    #     readingParameters = {}
+    #     readingParameters['name'] = "deepGM_template_mask"
+    #     readingParameters['center'] = True
+    #     readingParameters['show'] = False
+    #     readingParameters['labelmap'] = True
+    #     (readSuccess, dgmMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                                 "\\" + brainAtlas +
+    #                                                                 "\\dgm\\dgm_" + str(int(setAge)) + ".nii.gz", readingParameters,
+    #                                                                 True)
+    #   else:
+    #     readingParameters = {}
+    #     readingParameters['name'] = "deepGM_template_mask"
+    #     readingParameters['center'] = True
+    #     readingParameters['show'] = False
+    #     readingParameters['labelmap'] = True
+    #     (readSuccess, dgmMaskNode) = slicer.util.loadVolume(databasePath +
+    #                                                                 "/" + brainAtlas +
+    #                                                                 "/dgm/dgm_" + str(int(setAge)) + ".nii.gz", readingParameters,
+    #                                                                 True)
+    #
+    #   # Transforming the basal ganglia mask to native space
+    #   tmpDeepGMLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    #   tmpDeepGMLabelMask.SetName("tmpdeepGM_mask")
+    #   slicer.mrmlScene.AddNode(tmpDeepGMLabelMask)
+    #   self.applyRegistrationTransforms(registrationAlgorithm
+    #                                    , dgmMaskNode
+    #                                    , tmpResampledInputNode
+    #                                    , tmpDeepGMLabelMask
+    #                                    , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+    #                                    , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+    #                                    , True)
+    #
+    #   self.combineLabels(tmpDeepGMLabelMask, outputVolume, outputVolume)
+    #   slicer.util.showStatusMessage("Basal ganglia segmentation is finished...")
+    #
 
-    self.segmentingTissues(tmpBrainOnlyNode
-                           , modality
-                           , 4
-                           , brainOnlyLabelMask
-                           , definitions=definitions)
-    slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...") # TODO Sera que passar median filter aqui eh melhor do que no final?
-
-    ######################################################################################
-    # Step  - Split brain hemispheres (only adjust the mask on the native space)
-    ######################################################################################
-    # Reading brain hemispheres mask from atlas
-    if platform.system() is "Windows":
-      readingParameters = {}
-      readingParameters['name'] = "hemisphere_template_mask"
-      readingParameters['center'] = True
-      readingParameters['show'] = False
-      readingParameters['labelmap'] = True
-      (readSuccess, hemispheresMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                 "\\" + brainAtlas +
-                                                                 "\\hemispheres.nii.gz", readingParameters,
-                                                                 True)
-    else:
-      readingParameters = {}
-      readingParameters['name'] = "hemisphere_template_mask"
-      readingParameters['center'] = True
-      readingParameters['show'] = False
-      readingParameters['labelmap'] = True
-      (readSuccess, hemispheresMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                 "/" + brainAtlas +
-                                                                 "/hemispheres.nii.gz", readingParameters,
-                                                                 True)
-
-    # Transforming the hemispheres mask to native space
-    tmpHemispheresLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    tmpHemispheresLabelMask.SetName("tmpHemispheres_mask")
-    slicer.mrmlScene.AddNode(tmpHemispheresLabelMask)
-    self.applyRegistrationTransforms(registrationAlgorithm
-                                     , hemispheresMaskNode
-                                     , tmpResampledInputNode
-                                     , tmpHemispheresLabelMask
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
-                                     , True)
-    slicer.util.showStatusMessage("Brain hemispheres space definition is finished...")
-
-    ######################################################################################
-    # Step  - Setting up the brain hemispheres value (white matter, gray matter and ventricules)
-    ######################################################################################
-    # Reading brain hemispheres mask from atlas
-    if platform.system() is "Windows":
-        readingParameters = {}
-        readingParameters['name'] = "ventricules_template_mask"
-        readingParameters['center'] = True
-        readingParameters['show'] = False
-        readingParameters['labelmap'] = True
-        (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                    "\\" + brainAtlas +
-                                                                    "\\ventricules\\ventricules_" + str(setAge) + ".nii.gz", readingParameters,
-                                                                    True)
-    else:
-        readingParameters = {}
-        readingParameters['name'] = "ventricules_template_mask"
-        readingParameters['center'] = True
-        readingParameters['show'] = False
-        readingParameters['labelmap'] = True
-        (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                    "/" + brainAtlas +
-                                                                    "/ventricules/ventricules_" + str(setAge) + ".nii.gz", readingParameters,
-                                                                    True)
-
-    # Transforming the hemispheres mask to native space
-    tmpVentriculesLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    tmpVentriculesLabelMask.SetName("tmpVentricules_mask")
-    slicer.mrmlScene.AddNode(tmpVentriculesLabelMask)
-    self.applyRegistrationTransforms(registrationAlgorithm
-                                     , venctriculesMaskNode
-                                     , tmpResampledInputNode
-                                     , tmpVentriculesLabelMask
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
-                                     , True)
-
-    # Adjusting the brain hemispheres labels, taking care to ventricules being set to value 10
-    brainOnlyHemispheresLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    brainOnlyHemispheresLabelMask.SetName("brain_hemispheres_tissue_mask")
-    slicer.mrmlScene.AddNode(brainOnlyHemispheresLabelMask)
-    params = {}
-    params['inputLabel'] = brainOnlyLabelMask.GetID()
-    params['splitLabel'] = tmpVentriculesLabelMask.GetID()
-    params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID() # TODO Verificar se ao inves de marcar os ventriculos apenas pelos labels, fazer a segmentacao novamente pode ser melhor. O cerebro pode ja vir filtrado com median filter e os ventriculos sao resegmentados...
-    if modality == "T1":
-        params['labelSideA'] = 9
-    else:
-        params['labelSideA'] = 7
-    params['labelSideB'] = 0
-    params['doKeepSomeValues'] = True
-    if modality == 'T1':
-        params['keepSideA'] = "2,3"
-        params['keepSideB'] = "1,2,3"
-    else:
-        params['keepSideA'] = "1,2"
-        params['keepSideB'] = "1,2,3"
-
-    slicer.cli.run(slicer.modules.splitlabelvalues, None, params, wait_for_completion=True)
-    slicer.util.showStatusMessage("Brain hemispheres detection and separation is finished...")
-
-    # Adjusting the brain hemispheres globally, i.e. right-left white, gray and ventricules. CSF is constant regardless laterality
-    params = {}
-    params['inputLabel'] = brainOnlyHemispheresLabelMask.GetID()
-    params['splitLabel'] = tmpHemispheresLabelMask.GetID()
-    params['outputLabel'] = brainOnlyHemispheresLabelMask.GetID()
-    params['labelSideA'] = 20
-    params['labelSideB'] = 40
-    params['doKeepSomeValues'] = True  # This will maintain the CSF intact
-    csf = 3
-    if modality == 'T1':
-      csf = 1
-    params['keepSideA'] = csf
-    params['keepSideB'] = csf
-
-    slicer.cli.run(slicer.modules.splitlabelvalues, None, params, wait_for_completion=True)
-
-    slicer.util.showStatusMessage("Ventricules detection and separation is finished...")
-
-    ######################################################################################
-    # Step  - Merging brainstem, cerebellum and brain hemispheres all the tissues together
-    ######################################################################################
-    fullBrainSegmentationLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    fullBrainSegmentationLabelMask.SetName("full_brain_tissues_mask")
-    slicer.mrmlScene.AddNode(fullBrainSegmentationLabelMask)
-    self.combineLabels(brainOnlyHemispheresLabelMask, brainstemPlusCerebellumLabelMask, outputVolume)
-
-    slicer.util.showStatusMessage("Brain parcellation is finished...")
-
-    if estimateBasalGanglia:
-      ######################################################################################
-      # Step  - Merging basal ganglia to other labels all the tissues together
-      ######################################################################################
-      # Reading brain hemispheres mask from atlas
-      if platform.system() is "Windows":
-        readingParameters = {}
-        readingParameters['name'] = "deepGM_template_mask"
-        readingParameters['center'] = True
-        readingParameters['show'] = False
-        readingParameters['labelmap'] = True
-        (readSuccess, dgmMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                    "\\" + brainAtlas +
-                                                                    "\\dgm\\dgm_" + str(setAge) + ".nii.gz", readingParameters,
-                                                                    True)
-      else:
-        readingParameters = {}
-        readingParameters['name'] = "deepGM_template_mask"
-        readingParameters['center'] = True
-        readingParameters['show'] = False
-        readingParameters['labelmap'] = True
-        (readSuccess, dgmMaskNode) = slicer.util.loadVolume(databasePath +
-                                                                    "/" + brainAtlas +
-                                                                    "/dgm/dgm_" + str(setAge) + ".nii.gz", readingParameters,
-                                                                    True)
-
-      # Transforming the basal ganglia mask to native space
-      tmpDeepGMLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-      tmpDeepGMLabelMask.SetName("tmpdeepGM_mask")
-      slicer.mrmlScene.AddNode(tmpDeepGMLabelMask)
-      self.applyRegistrationTransforms(registrationAlgorithm
-                                       , dgmMaskNode
-                                       , tmpResampledInputNode
-                                       , tmpDeepGMLabelMask
-                                       , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
-                                       , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
-                                       , True)
-
-      self.combineLabels(tmpDeepGMLabelMask, outputVolume, outputVolume)
-      slicer.util.showStatusMessage("Basal ganglia segmentation is finished...")
-
-    ######################################################################################
-    # Step  - Smoothing brain segmentation by median filtering
-    ######################################################################################
-    for i in range(0, interations):
-      params = {}
-      params['neighborhood'] = neighborSize
-      params['inputVolume'] = outputVolume
-      params['outputVolume'] = outputVolume
-
-      slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True) # TODO Verificar se o median filter eh dado em voxel ou em mm
-      slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
-
-    # if not debugMode: # TODO Remover ou nao o debug mode no modulo...???
-    ######################################################################################
-    # Step  - Cleaning temporaty data (Debug mode: Off)
-    ######################################################################################
-    if jumpedAtlasPropagation:
-      slicer.mrmlScene.RemoveNode(brainAtlasNode)
-
-    slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
-    slicer.mrmlScene.RemoveNode(brainMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpBrainMask)
-    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
-    slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
-    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
-    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
-    slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
-    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
-    slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
-    slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
-    slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
-    slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
-    slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
-    slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
-    slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
-    slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
-
-    if estimateBasalGanglia:
-      slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
+    # # if not debugMode: # TODO Remover ou nao o debug mode no modulo...???
+    # ######################################################################################
+    # # Step  - Cleaning temporaty data (Debug mode: Off)
+    # ######################################################################################
+    # if jumpedAtlasPropagation:
+    #   slicer.mrmlScene.RemoveNode(brainAtlasNode)
+    #
+    # slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
+    # slicer.mrmlScene.RemoveNode(brainMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpBrainMask)
+    # slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    # slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
+    # slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    # slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    # slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
+    # slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    # slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
+    # slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
+    # slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
+    # slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
+    # slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
+    # slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
+    # slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
+    # slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
+    #
+    # if estimateBasalGanglia:
+    #   slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
 
     logging.info('Processing completed')
     slicer.util.showStatusMessage("Baby Brain Segmentation is finished")
@@ -1158,7 +1256,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       params["interpolationMode"] = "NearestNeighbor"
       params["pixelType"] = "binary"
     else:
-      params["interpolationMode"] = "BSpline"
+      params["interpolationMode"] = "Linear"
       params["pixelType"] = "float"
 
     slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
@@ -1173,7 +1271,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       params["interpolationMode"] = "NearestNeighbor"
       params["pixelType"] = "binary"
     else:
-      params["interpolationMode"] = "BSpline"
+      params["interpolationMode"] = "Linear"
       params["pixelType"] = "float"
 
     slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
@@ -1201,11 +1299,14 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                            , numberOfTissues
                            , outputLabel
                            , oneTissue = False
+                           , inputPriorsFile=None
                            , tissueValue = 2
                            , definitions = [1,2,3]):
 
     params = {}
     params['inputVolume'] = inputVolume.GetID()
+    if inputPriorsFile is not "":
+        params['inputPriorsFile'] = inputPriorsFile
     params['imageModality'] = imageModality
     params['numberOfTissues'] = numberOfTissues
     params['outputLabel'] = outputLabel.GetID()

@@ -465,7 +465,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setFilteringTimeStepWidget.singleStep = 0.0001
     self.setFilteringTimeStepWidget.minimum = 0.0001
     self.setFilteringTimeStepWidget.maximum = 0.0625
-    self.setFilteringTimeStepWidget.value = 0.04
+    self.setFilteringTimeStepWidget.value = 0.0400
     self.setFilteringTimeStepWidget.setToolTip("Time step parameter.")
 
     ManualAdjustmentsLayout.addRow("Conductance ", self.setFilteringCondutanceWidget)
@@ -883,7 +883,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
                                                              "\\" + brainAtlas +
                                                              "\\templates\\template_" + modality + "_" + str(
-        setAge) + ".nii.gz", readingParameters, True)
+        int(setAge)) + ".nii.gz", readingParameters, True)
     else:
       readingParameters = {}
       readingParameters['name'] = "brain_template"
@@ -892,7 +892,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       (readSuccess, brainAtlasNode) = slicer.util.loadVolume(databasePath +
                                                              "/" + brainAtlas +
                                                              "/templates/template_" + modality + "_" + str(
-        setAge) + ".nii.gz", readingParameters, True)
+        int(setAge)) + ".nii.gz", readingParameters, True)
 
     ######################################################################################
     # Step  - Atlas propagation - linear and elastic transformations

@@ -631,9 +631,6 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     else:
         tmpFolder = home + "/tmpBRAINSFitBabyBrainSegmentation" # TODO Colocar uma pasta temporaria para o BRAINSFit tambem!! fazer com isso seja o output geral da extensao, que o usuario pode querer salvar se quiser!!! (Debug mode foi parecido com isso!!)
 
-
-
-
     slicer.util.showStatusMessage("Atlas propagation is finished...")
     ######################################################################################
     # Step  - Resampling the input volume
@@ -771,6 +768,46 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     # Saving the cerebellum priors image
     slicer.util.saveNode(tmpCerebellumPriors, tmpFolder + '/cerebellum_priors.nii.gz')
 
+    # Reading the CSF part of the cerebellum prior probability and adjusting to native space
+    tmpCSFCerebellumPriors = slicer.vtkMRMLScalarVolumeNode()
+    tmpCSFCerebellumPriors.SetName("csf_cerebellum_priors")
+    slicer.mrmlScene.AddNode(tmpCSFCerebellumPriors)
+    # Reading cerebellum volume mask from atlas
+    if platform.system() is "Windows":
+      readingParameters = {}
+      readingParameters['name'] = "csf_cerebellum_template_priors"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = False
+      (readSuccess, csfCerebellumPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                   "\\" + brainAtlas +
+                                                                   "\\csf\\csf_cerebellum_prob_" + str(
+        int(setAge)) + ".nii.gz", readingParameters,
+                                                                   True)
+    else:
+      readingParameters = {}
+      readingParameters['name'] = "csf_cerebellum_template_priors"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = False
+      (readSuccess, csfCerebellumPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                   "/" + brainAtlas +
+                                                                   "/csf/csf_cerebellum_prob_" + str(
+        int(setAge)) + ".nii.gz", readingParameters,
+                                                                   True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , csfCerebellumPriorsNode
+                                     , tmpResampledInputNode
+                                     , tmpCSFCerebellumPriors
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , False)
+
+    # Saving the cerebellum priors image
+    slicer.util.saveNode(tmpCSFCerebellumPriors, tmpFolder + '/csf_cerebellum_priors.nii.gz')
+
+
 
     # Reading the brainstem region from atlas and adjusting to native space
     tmpBrainstemMask = slicer.vtkMRMLLabelMapVolumeNode()
@@ -843,6 +880,45 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     # Saving the brainstem priors image
     slicer.util.saveNode(tmpBrainstemPriors, tmpFolder + '/brainstem_priors.nii.gz')
 
+    # Reading the csf part of the brainstem priors and adjusting to native space
+    tmpCSFBrainstemPriors = slicer.vtkMRMLScalarVolumeNode()
+    tmpCSFBrainstemPriors.SetName("csf_brainstem_priors")
+    slicer.mrmlScene.AddNode(tmpCSFBrainstemPriors)
+    # Reading brainstem volume mask from atlas
+    if platform.system() is "Windows":
+      readingParameters = {}
+      readingParameters['name'] = "csf_brainstem_template_priors"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = False
+      (readSuccess, csfBrainstemPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                  "\\" + brainAtlas +
+                                                                  "\\csf\\csf_brainstem_prob_" + str(
+        int(setAge)) + ".nii.gz", readingParameters,
+                                                                  True)
+    else:
+      readingParameters = {}
+      readingParameters['name'] = "csf_brainstem_template_priors"
+      readingParameters['center'] = True
+      readingParameters['show'] = False
+      readingParameters['labelmap'] = False
+      (readSuccess, csfBrainstemPriorsNode) = slicer.util.loadVolume(databasePath +
+                                                                  "/" + brainAtlas +
+                                                                  "/csf/csf_brainstem_prob_" + str(
+        int(setAge)) + ".nii.gz", readingParameters,
+                                                                  True)
+
+    self.applyRegistrationTransforms(registrationAlgorithm
+                                     , csfBrainstemPriorsNode
+                                     , tmpResampledInputNode
+                                     , tmpCSFBrainstemPriors
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
+                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , False)
+
+    # Saving the brainstem priors image
+    slicer.util.saveNode(tmpCSFBrainstemPriors, tmpFolder + '/csf_brainstem_priors.nii.gz')
+
 
     # Removing brainstem and cerebellum from the input image
     inputImage = sitkUtils.PullVolumeFromSlicer(tmpResampledInputNode)
@@ -862,7 +938,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     slicer.util.showStatusMessage("Brainstem and cerebellum removal is finished...")
 
     ######################################################################################
-    # Step  - Segmenting the cerebellum and brainstem # TODO Pode colocar as priors do atlas aqui...so fazer o resampling com interpolacao linear...atualizar o Bayesian tissue classifier module para poder entrar com o prior
+    # Step  - Segmenting the cerebellum and brainstem # TODO Pode colocar as priors do atlas aqui...so fazer o resampling com interpolacao linear..
     ######################################################################################
     # Cerebellum
     tmpCerebellumOnlyVolumeNode = slicer.vtkMRMLScalarVolumeNode()
@@ -884,12 +960,33 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     if modality == 'T1':
       definitions = [3,5]
 
-    path2CerebellumPriors=tmpFolder + '/cerebellum_priors.nii.gz' # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
+    # Creating background priors to cerebellum segmentation
+    listOfTissuesPriors = [tmpCerebellumPriors, tmpCSFCerebellumPriors]
+    backgroundForCerebellumPrior = slicer.vtkMRMLScalarVolumeNode()
+    backgroundForCerebellumPrior.SetName("background_cerebellum_priors")
+    slicer.mrmlScene.AddNode(backgroundForCerebellumPrior)
+    self.createBackgroundPriors(backgroundForCerebellumPrior, listOfTissuesPriors)
+
+    slicer.util.saveNode(backgroundForCerebellumPrior, tmpFolder + '/background_cerebellum_priors.nii.gz')
+
+    if platform.system() is "Windows":
+      path2CerebellumPriors = tmpFolder + '\\cerebellum_priors.nii.gz'  # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
+      path2CSFCerebellumPriors = tmpFolder + '\\csf_cerebellum_priors.nii.gz'
+      path2BackgroundCerebellumPriors = tmpFolder + '\\background_cerebellum_priors.nii.gz'
+    else:
+      path2CerebellumPriors=tmpFolder + '/cerebellum_priors.nii.gz' # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
+      path2CSFCerebellumPriors=tmpFolder + '/csf_cerebellum_priors.nii.gz'
+      path2BackgroundCerebellumPriors = tmpFolder + '/background_cerebellum_priors.nii.gz'
+
+    listOfTissuesPriors = [path2BackgroundCerebellumPriors, path2CerebellumPriors, path2CSFCerebellumPriors]
+    if modality == "T1":
+      listOfTissuesPriors = [path2BackgroundCerebellumPriors, path2CSFCerebellumPriors, path2CerebellumPriors]
+
     self.segmentingTissues(tmpCerebellumOnlyVolumeNode
                            , modality
                            , 3
                            , cerebellumOnlyLabelMask
-                           , inputPriorsFile=path2CerebellumPriors
+                           , inputPriorsFile=listOfTissuesPriors
                            , definitions=definitions ) # Cerebellum and CSF
 
     # Brainstem
@@ -912,13 +1009,35 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     if modality == 'T1':
       definitions = [3,4]
 
-    path2BrainstemPriors = tmpFolder + '/brainstem_priors.nii.gz'
+    # Creating background priors to cerebellum segmentation
+    listOfTissuesPriors = [tmpBrainstemPriors, tmpCSFBrainstemPriors]
+    backgroundForBrainstemPrior = slicer.vtkMRMLScalarVolumeNode()
+    backgroundForBrainstemPrior.SetName("background_brainstem_priors")
+    slicer.mrmlScene.AddNode(backgroundForBrainstemPrior)
+    self.createBackgroundPriors(backgroundForBrainstemPrior, listOfTissuesPriors)
+
+    slicer.util.saveNode(backgroundForBrainstemPrior, tmpFolder + '/background_brainstem_priors.nii.gz')
+
+    if platform.system() is "Windows":
+      path2BrainstemPriors = tmpFolder + '\\brainstem_priors.nii.gz'  # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
+      path2CSFBrainstemPriors = tmpFolder + '\\csf_brainstem_priors.nii.gz'
+      path2BackgroundPriors = tmpFolder + '\\background_brainstem_priors.nii.gz'
+    else:
+      path2BrainstemPriors = tmpFolder + '/brainstem_priors.nii.gz'  # TODO ERRO DE SEGMENTACAO AQUI PARA FRENTE...NAO SAI COM PRIORS CORRETAMENTE!!
+      path2CSFBrainstemPriors = tmpFolder + '/csf_brainstem_priors.nii.gz'
+      path2BackgroundPriors = tmpFolder + '/background_brainstem_priors.nii.gz'
+
+    listOfTissuesPriors = [path2BackgroundPriors, path2BrainstemPriors, path2CSFBrainstemPriors]
+    if modality == "T1":
+      listOfTissuesPriors = [path2BackgroundPriors, path2CSFBrainstemPriors, path2BrainstemPriors]
+
     self.segmentingTissues(tmpBrainstemOnlyVolumeNode
                            , modality
                            , 3
                            , brainstemOnlyLabelMask
-                           , inputPriorsFile=path2BrainstemPriors
+                           , inputPriorsFile=listOfTissuesPriors
                            , definitions=definitions) # Brainstem and CSF
+
 
     # Merging both labels into one
     brainstemPlusCerebellumLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
@@ -927,37 +1046,49 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     self.combineLabels(brainstemOnlyLabelMask, cerebellumOnlyLabelMask, brainstemPlusCerebellumLabelMask)
 
     slicer.util.showStatusMessage("Brainstem and cerebellum segmentation is finished...")
+    ######################################################################################
+    # Step  - Smoothing posterior fossa segmentation by median filtering
+    ######################################################################################
+    for i in range(0, 4): # Set an empirical number of iterations for posterior fossa structures
+      params = {}
+      params['neighborhood'] = neighborSize
+      params['inputVolume'] = brainstemPlusCerebellumLabelMask
+      params['outputVolume'] = brainstemPlusCerebellumLabelMask
 
-    # ######################################################################################
-    # # Step  - Brain tissue segmentation (only brain)
-    # ######################################################################################
-    # brainOnlyLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
-    # brainOnlyLabelMask.SetName("brainOnly_tissues_mask")
-    # slicer.mrmlScene.AddNode(brainOnlyLabelMask)
-    #
-    # definitions = [1,2,3]
-    # if modality == 'T1':
-    #   definitions = [3,2,1]
-    #
-    # self.segmentingTissues(tmpBrainOnlyNode
-    #                        , modality
-    #                        , 4
-    #                        , brainOnlyLabelMask
-    #                        , definitions=definitions)
-    # slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...")
-    #
-    # ######################################################################################
-    # # Step  - Smoothing brain segmentation by median filtering
-    # ######################################################################################
-    # for i in range(0, interations):
-    #   params = {}
-    #   params['neighborhood'] = neighborSize
-    #   params['inputVolume'] = brainOnlyLabelMask
-    #   params['outputVolume'] = brainOnlyLabelMask
-    #
-    #   slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
-    #   slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
-    #
+      slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
+      slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
+
+
+    ######################################################################################
+    # Step  - Brain tissue segmentation (only brain)
+    ######################################################################################
+    brainOnlyLabelMask = slicer.vtkMRMLLabelMapVolumeNode()
+    brainOnlyLabelMask.SetName("brainOnly_tissues_mask")
+    slicer.mrmlScene.AddNode(brainOnlyLabelMask)
+
+    definitions = [1,2,3]
+    if modality == 'T1':
+      definitions = [3,2,1]
+
+    self.segmentingTissues(tmpBrainOnlyNode
+                           , modality
+                           , 4
+                           , brainOnlyLabelMask
+                           , definitions=definitions)
+    slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...")
+
+    ######################################################################################
+    # Step  - Smoothing brain segmentation by median filtering
+    ######################################################################################
+    for i in range(0, interations):
+      params = {}
+      params['neighborhood'] = neighborSize
+      params['inputVolume'] = brainOnlyLabelMask
+      params['outputVolume'] = brainOnlyLabelMask
+
+      slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
+      slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
+
 
     #
     # ######################################################################################
@@ -1129,36 +1260,36 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     #   slicer.util.showStatusMessage("Basal ganglia segmentation is finished...")
     #
 
-    # # if not debugMode: # TODO Remover ou nao o debug mode no modulo...???
-    # ######################################################################################
-    # # Step  - Cleaning temporaty data (Debug mode: Off)
-    # ######################################################################################
-    # if jumpedAtlasPropagation:
-    #   slicer.mrmlScene.RemoveNode(brainAtlasNode)
-    #
-    # slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
-    # slicer.mrmlScene.RemoveNode(brainMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpBrainMask)
-    # slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
-    # slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
-    # slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
-    # slicer.mrmlScene.RemoveNode(brainstemMaskNode)
-    # slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
-    # slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
-    # slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
-    # slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
-    # slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
-    # slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
-    # slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
-    # slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
-    # slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
-    # slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
-    #
-    # if estimateBasalGanglia:
-    #   slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
+    # if not debugMode: # TODO Remover ou nao o debug mode no modulo...???
+    ######################################################################################
+    # Step  - Cleaning temporaty data (Debug mode: Off)
+    ######################################################################################
+    if jumpedAtlasPropagation:
+      slicer.mrmlScene.RemoveNode(brainAtlasNode)
+
+    slicer.mrmlScene.RemoveNode(tmpResampledInputNode)
+    slicer.mrmlScene.RemoveNode(brainMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainMask)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
+    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumOnlyVolumeNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemOnlyVolumeNode)
+    slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
+    slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
+    slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
+    slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
+    slicer.mrmlScene.RemoveNode(fullBrainSegmentationLabelMask)
+
+    if estimateBasalGanglia:
+      slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
 
     logging.info('Processing completed')
     slicer.util.showStatusMessage("Baby Brain Segmentation is finished")
@@ -1299,14 +1430,19 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                            , numberOfTissues
                            , outputLabel
                            , oneTissue = False
-                           , inputPriorsFile=None
+                           , inputPriorsFile=""
                            , tissueValue = 2
                            , definitions = [1,2,3]):
+
+
 
     params = {}
     params['inputVolume'] = inputVolume.GetID()
     if inputPriorsFile is not "":
-        params['inputPriorsFile'] = inputPriorsFile
+      listOfPriors = ""
+      for i in inputPriorsFile:
+        listOfPriors = listOfPriors + str(i) + ","
+      params['inputPriorsFile'] = listOfPriors
     params['imageModality'] = imageModality
     params['numberOfTissues'] = numberOfTissues
     params['outputLabel'] = outputLabel.GetID()
@@ -1331,6 +1467,39 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     params['FirstOverwrites'] = firstOverwrites
 
     slicer.cli.run(slicer.modules.imagelabelcombine, None, params, wait_for_completion=True)
+
+  def createBackgroundPriors(self, backgroundNode
+                             , listOfTissuesPriors
+                             , order=0):
+
+
+    #Making the first sum
+    params = {}
+    params['inputVolume1'] = listOfTissuesPriors[0].GetID()
+    params['inputVolume2'] = listOfTissuesPriors[1].GetID()
+    params['outputVolume'] = backgroundNode
+    params['order'] = order
+
+    slicer.cli.run(slicer.modules.addscalarvolumes, None, params, wait_for_completion=True)
+
+    N=len(listOfTissuesPriors)
+    if N > 2:
+      for tissue in range(2,N):
+        params = {}
+        params['inputVolume1'] = backgroundNode
+        params['inputVolume2'] = listOfTissuesPriors[tissue].GetID()
+        params['outputVolume'] = backgroundNode
+        params['order'] = order
+
+        slicer.cli.run(slicer.modules.addscalarvolumes, None, params, wait_for_completion=True)
+
+    # Making the inverse of the summation to infer the background prior
+    inputImage = sitkUtils.PullVolumeFromSlicer(backgroundNode)
+    subtractFilter = sitk.SubtractImageFilter()
+    absFilter = sitk.AbsImageFilter()
+    backgroundImage = subtractFilter.Execute(inputImage, 1.0)
+    backgroundImage = absFilter.Execute(backgroundImage)
+    sitkUtils.PushVolumeToSlicer(backgroundImage, backgroundNode)
 
 
 class BabyBrainSegmentationTest(ScriptedLoadableModuleTest):

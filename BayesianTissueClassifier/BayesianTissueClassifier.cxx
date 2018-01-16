@@ -62,41 +62,28 @@ int DoIt( int argc, char * argv[], T )
 
     bayesClassifier->SetInput( bayesianInitializer->GetOutput() );
 
-    if (inputPriorsFile!="") {
-        std::cout<<"Using tissues priors at location: "<<inputPriorsFile.c_str()<<std::endl;
-        typename PriorsReaderType::Pointer priorsReader = PriorsReaderType::New();
-        priorsReader->SetFileName( inputPriorsFile.c_str() );
-        priorsReader->Update();
+    if (!inputPriorsFile.empty()) {
+        std::vector<InputImageType::Pointer> inputPriors;
+        for (unsigned int prior = 0; prior < inputPriorsFile.size(); ++prior) {
+            std::cout<<"Using tissues priors ("<<(prior+1)<<") at location: "<<inputPriorsFile[prior].c_str()<<std::endl;
 
-        //Creating vector priors (using the inverse of the input prior)
-        typedef itk::SubtractImageFilter<InputImageType>    SubtractFilterType;
-        typename SubtractFilterType::Pointer sub = SubtractFilterType::New();
-
-        sub->SetInput1(priorsReader->GetOutput());
-        sub->SetConstant2(1.0);
-
-        typedef itk::AbsImageFilter<InputImageType, InputImageType>     AbsFilterType;
-        typename AbsFilterType::Pointer abs = AbsFilterType::New();
-
-        abs->SetInput(sub->GetOutput());
+            typename PriorsReaderType::Pointer priorsReader = PriorsReaderType::New();
+            priorsReader->SetFileName( inputPriorsFile[prior].c_str() );
+            priorsReader->Update();
+            inputPriors.push_back(priorsReader->GetOutput());
+        }
 
         //Creating the bayesian input priors
         typedef itk::ComposeImageFilter<InputImageType, VectorInputImageType> ComposeType;
-        typename ComposeType::Pointer priorImage = ComposeType::New();
+        typename ComposeType::Pointer priorsImage = ComposeType::New();
 
-        //Change the order of segmentation depending of the input image modality
-        if (imageModality=="T1") {
-            priorImage->SetInput(0,abs->GetOutput());
-            priorImage->SetInput(1,priorsReader->GetOutput());
-        }else{
-            priorImage->SetInput(0,priorsReader->GetOutput());
-            priorImage->SetInput(1,abs->GetOutput());
+        for (unsigned int prior = 0; prior < inputPriors.size(); ++prior) {
+            priorsImage->SetInput(prior, inputPriors[prior]);
         }
+        priorsImage->Update();
 
-        priorImage->Update();
-
-        std::cout << "Image priors with "<<priorImage->GetOutput()->GetNumberOfComponentsPerPixel() <<" number of components." << std::endl;
-        bayesClassifier->SetPriors( priorImage->GetOutput() );
+        std::cout << "Image priors with "<<priorsImage->GetOutput()->GetNumberOfComponentsPerPixel() <<" number of components." << std::endl;
+        bayesClassifier->SetPriors( priorsImage->GetOutput() );
     }
 
     if (imageModality=="T1") {

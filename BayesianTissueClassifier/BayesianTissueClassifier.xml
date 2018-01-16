@@ -28,12 +28,12 @@
 	      <element>T2</element>
 	      <element>PD</element>
 	</string-enumeration>
-    <string>
+    <string-vector>
       <name>inputPriorsFile</name>
       <longflag>--priorsFile</longflag>
       <label>Input Priors Probability</label>
-      <description><![CDATA[The probability priors for the input image. If this is empty, the naive Bayes classification is performed]]></description>
-    </string>
+      <description><![CDATA[A comma separated list of probability priors for the input image. If this is empty, the naive Bayes classification is performed]]></description>
+    </string-vector>
     <integer>
       <name>numberOfTissues</name>
       <longflag>--nTissues</longflag>

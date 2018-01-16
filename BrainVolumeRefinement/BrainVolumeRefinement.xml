@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Examples</category>
+  <title>Brain Volume Refinement</title>
+  <description><![CDATA[This is a CLI module that can be bundled in an extension]]></description>
+  <version>0.0.1</version>
+  <documentation-url>http://www.example.com/Slicer/Modules/BrainVolumeRefinement</documentation-url>
+  <license>Slicer</license>
+  <contributor>FirstName LastName (Institution), FirstName LastName (Institution)</contributor>
+  <acknowledgements>This work was partially funded by NIH grant NXNNXXNNNNNN-NNXN</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image type="scalar">
+      <name>inputVolume</name>
+      <label>Input Volume</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input volume]]></description>
+    </image>
+    <image type="label">
+      <name>maskVolume</name>
+      <label>Mask Volume</label>
+      <longflag>--mask</longflag>
+      <flag>m</flag>
+      <channel>input</channel>
+      <description><![CDATA[Mask volume]]></description>
+    </image>
+    <image type="scalar">
+      <name>updatedVolume</name>
+      <label>Updated Volume</label>
+      <channel>output</channel>
+      <index>1</index>
+      <description><![CDATA[Updated Volume]]></description>
+    </image>
+  </parameters>
+  <parameters>
+  <label>Brain Volume Refinement Parameters</label>
+    <description><![CDATA[Brain volume refinement parameters]]></description>
+    <integer>
+      <name>foregroundValue</name>
+      <longflag>--foregroundValue</longflag>
+      <flag>f</flag>
+      <label>Foreground Value</label>
+      <description><![CDATA[An integer value that defines the label mask value that shoulb be adopted. This is useful for a multilabel input.]]></description>
+      <default>1</default>
+    </integer>
+    <integer-vector>
+      <name>neighborRadius</name>
+      <longflag>--neighborRadius</longflag>
+      <flag>r</flag>
+      <label>Neighborhood Radius</label>
+      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood. This should large enough in order to get the bounderie tissues present in the input image. The neighborhood is running over the contour of the input mask. Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).]]></description>
+      <default>10,10,10</default>
+    </integer-vector>
+    <string-enumeration>
+      <name>approach</name>
+      <longflag>--approach</longflag>
+      <flag>a</flag>
+      <label>Statistics Approach</label>
+      <description><![CDATA[A list of approaches used to infer the closest object voxel in the neighborhood.]]></description>
+      <default>GradientMagnitude</default>
+      <element>GradientMagnitude</element>
+      <element>Mean</element>
+    </string-enumeration>
+  </parameters>
+</executable>

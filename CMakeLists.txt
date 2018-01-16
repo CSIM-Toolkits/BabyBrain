@@ -26,6 +26,7 @@ add_subdirectory(BabyBrainPreparation)
 add_subdirectory(GlobalContrastEnhancer)
 add_subdirectory(BayesianTissueClassifier)
 add_subdirectory(SplitLabelValues)
+add_subdirectory(BrainVolumeRefinement)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------

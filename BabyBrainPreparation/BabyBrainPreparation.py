@@ -450,7 +450,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setFilteringNumberOfIterationWidget = ctk.ctkSliderWidget()
     self.setFilteringNumberOfIterationWidget.maximum = 50
     self.setFilteringNumberOfIterationWidget.minimum = 1
-    self.setFilteringNumberOfIterationWidget.value = 25
+    self.setFilteringNumberOfIterationWidget.value = 6
     self.setFilteringNumberOfIterationWidget.singleStep = 1
     self.setFilteringNumberOfIterationWidget.setToolTip("Number of iterations parameter.")
 
@@ -458,14 +458,14 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setFilteringQWidget.singleStep = 0.01
     self.setFilteringQWidget.minimum = 0.01
     self.setFilteringQWidget.maximum = 1.99
-    self.setFilteringQWidget.value = 1.4
+    self.setFilteringQWidget.value = 1.2
     self.setFilteringQWidget.setToolTip("Q value parameter.")
 
     self.setFilteringTimeStepWidget = ctk.ctkSliderWidget()
     self.setFilteringTimeStepWidget.singleStep = 0.0001
     self.setFilteringTimeStepWidget.minimum = 0.0001
     self.setFilteringTimeStepWidget.maximum = 0.0625
-    self.setFilteringTimeStepWidget.value = 0.0400
+    self.setFilteringTimeStepWidget.value = 0.0500
     self.setFilteringTimeStepWidget.setToolTip("Time step parameter.")
 
     ManualAdjustmentsLayout.addRow("Conductance ", self.setFilteringCondutanceWidget)
@@ -541,7 +541,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setShrinkFactorSecondLevelWidget = qt.QSpinBox()
     self.setShrinkFactorSecondLevelWidget.setMinimum(1)
     self.setShrinkFactorSecondLevelWidget.setMaximum(30)
-    self.setShrinkFactorSecondLevelWidget.setValue(3)
+    self.setShrinkFactorSecondLevelWidget.setValue(2)
     self.setShrinkFactorSecondLevelWidget.setToolTip(
       "The same as in Shrink Factor (First Level).")
     parametersBiasCorrectionLayout.addRow("Shrink Factor (Second Level) ", self.setShrinkFactorSecondLevelWidget)
@@ -562,8 +562,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     #
     self.setContrastModulationFunctionComboBoxWidget = ctk.ctkComboBox()
     self.setContrastModulationFunctionComboBoxWidget.addItem("Logistic")
-    self.setContrastModulationFunctionComboBoxWidget.addItem("CLAHE") #TODO Implementar CLAHE e CDF image contrast enhancement functions para ITK!!!
-    self.setContrastModulationFunctionComboBoxWidget.addItem("CDF")
+    # self.setContrastModulationFunctionComboBoxWidget.addItem("CLAHE") #TODO Implementar CLAHE e CDF image contrast enhancement functions para ITK!!!
+    # self.setContrastModulationFunctionComboBoxWidget.addItem("CDF")
     self.setContrastModulationFunctionComboBoxWidget.setToolTip(
       "Contrast modulation functions used to enhance tissue signal contrast in all image scale space. These methods are based on image histogram.")
     parametersGlobalContrastEnhancementLayout.addRow("Contrast Modulation Function ", self.setContrastModulationFunctionComboBoxWidget)
@@ -1121,12 +1121,12 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     ######################################################################################
     # Step  - Cleaning temporaty data (Debug mode: Off)
     ######################################################################################
-    slicer.mrmlScene.RemoveNode(brainAtlasNode)
-    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
-    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
-    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
-    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    # slicer.mrmlScene.RemoveNode(brainAtlasNode)
+    # slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    # slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    # slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    # slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
 
 
     home = expanduser("~")

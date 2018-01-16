@@ -862,7 +862,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     slicer.util.showStatusMessage("Brainstem and cerebellum removal is finished...")
 
     ######################################################################################
-    # Step  - Segmenting the cerebellum and brainstem
+    # Step  - Segmenting the cerebellum and brainstem # TODO Pode colocar as priors do atlas aqui...so fazer o resampling com interpolacao linear...atualizar o Bayesian tissue classifier module para poder entrar com o prior
     ######################################################################################
     # Cerebellum
     tmpCerebellumOnlyVolumeNode = slicer.vtkMRMLScalarVolumeNode()

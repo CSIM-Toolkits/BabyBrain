@@ -159,7 +159,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     #
     parametersImageResamplingCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersImageResamplingCollapsibleButton.text = "Image Space Resampling Parameters"
-    parametersImageResamplingCollapsibleButton.collapsed = False
+    parametersImageResamplingCollapsibleButton.collapsed = True
     self.layout.addWidget(parametersImageResamplingCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -191,6 +191,52 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     parametersImageResamplingLayout.addRow("Interpolation ", self.setInterpolationFunctionComboBoxWidget)
 
     #
+    # Brain Volume Refinement Parameters Area
+    #
+    parametersBrainVolumeRefinementCollapsibleButton = ctk.ctkCollapsibleButton()
+    parametersBrainVolumeRefinementCollapsibleButton.text = "Brain Volume Refinement Parameters"
+    parametersBrainVolumeRefinementCollapsibleButton.collapsed = True
+    self.layout.addWidget(parametersBrainVolumeRefinementCollapsibleButton)
+
+    # Layout within the dummy collapsible button
+    parametersBrainVolumeRefinementLayout = qt.QFormLayout(parametersBrainVolumeRefinementCollapsibleButton)
+
+    #
+    # Apply Brain Volume Refinement
+    #
+    self.setApplyBrainVolumeRefinementBooleanWidget = ctk.ctkCheckBox()
+    self.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
+    self.setApplyBrainVolumeRefinementBooleanWidget.setToolTip(
+      "Check this if you want to refine the brain volume using the atlas brain mask. This step can be helpful if the "
+      "brain extraction procedure left some non-brain tissues in the input image.")
+    parametersBrainVolumeRefinementLayout.addRow("Apply Brain Volume Refinement",
+                                                 self.setApplyBrainVolumeRefinementBooleanWidget)
+
+    #
+    # Neighborhood Radius
+    #
+    self.setNeighborhoodRadiusWidget = qt.QLineEdit()
+    self.setNeighborhoodRadiusWidget.setText('10,10,10')
+    self.setNeighborhoodRadiusWidget.setToolTip("A list of 3 values indicating the (x,y,z) size of the neighborhood. "
+                                                "This should large enough in order to get the bounderie tissues present in the "
+                                                "input image. The neighborhood is running over the contour of the input mask."
+                                                " Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).")
+    parametersBrainVolumeRefinementLayout.addRow("Neighborhood Radius", self.setNeighborhoodRadiusWidget)
+
+    #
+    # Second Layer (Median Filtering) Radius
+    #
+    self.setSecondLayerMedianRadiusWidget = qt.QLineEdit()
+    self.setSecondLayerMedianRadiusWidget.setText('5,5,5')
+    self.setSecondLayerMedianRadiusWidget.setToolTip(
+      "A list of 3 values indicating the (x,y,z) size of the neighborhood used in "
+      "the second layer of the brain volume estimate. This parameter is responsible"
+      "to smooth fine details in the brain volume, which is usually smaller than the "
+      "first layer neighborhood radius size.")
+    parametersBrainVolumeRefinementLayout.addRow("Second Layer Neighborhood Radius",
+                                                 self.setSecondLayerMedianRadiusWidget)
+
+    #
     # Atlas Propagation Parameters Area
     #
     parametersAtlasPropagationCollapsibleButton = ctk.ctkCollapsibleButton()
@@ -201,16 +247,6 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     parametersAtlasPropagationLayout = qt.QFormLayout(parametersAtlasPropagationCollapsibleButton)
 
-    #
-    # Apply Brain Volume Refinement
-    #
-    self.setApplyBrainVolumeRefinementBooleanWidget = ctk.ctkCheckBox()
-    self.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
-    self.setApplyBrainVolumeRefinementBooleanWidget.setToolTip(
-        "Check this if you want to refine the brain volume using the atlas brain mask. This step can be helpful if the "
-        "brain extraction procedure left some non-brain tissues in the input image.")
-    parametersAtlasPropagationLayout.addRow("Apply Brain Volume Refinement",
-                                            self.setApplyBrainVolumeRefinementBooleanWidget)
 
     #
     # Brain Atlas
@@ -646,6 +682,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     logic = BabyBrainPreparationLogic()
     modality = self.setImageModalityBooleanWidget.currentText
     applyBrainVolumeRefinements = self.setApplyBrainVolumeRefinementBooleanWidget.isChecked()
+    neighborhoodFirstLevelRadius = self.setNeighborhoodRadiusWidget.text
+    neighborhoodSecondLevelRadius = self.setSecondLayerMedianRadiusWidget.text
     brainAtlas = self.setBrainAtlasComboBoxWidget.currentText
     age = self.setSubjectAgeIntegerWidget.value
     if self.setRadioBRAINS.isChecked():
@@ -691,6 +729,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
               , useGlobalContrastEnhancement
               , modality
               , applyBrainVolumeRefinements
+              , neighborhoodFirstLevelRadius
+              , neighborhoodSecondLevelRadius
               , brainAtlas
               , age
               , registrationAlgorithm
@@ -772,6 +812,8 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
           , useGlobalContrastEnhancement
           , modality
           , applyBrainVolumeRefinements
+          , neighborhoodFirstLevelRadius
+          , neighborhoodSecondLevelRadius
           , brainAtlas
           , age
           , registrationAlgorithm
@@ -926,6 +968,16 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     slicer.util.showStatusMessage("Atlas propagation is finished...")
 
     ######################################################################################
+    # Applying brain volume refinement
+    ######################################################################################
+    if applyBrainVolumeRefinements:
+      self.brainVolumeRefinement(outputVolume
+                                 , outputVolume
+                                 , neighborhoodFirstLevelRadius
+                                 , neighborhoodSecondLevelRadius)
+      slicer.util.showStatusMessage("Brain volume refinements is finished...")
+
+    ######################################################################################
     # Step  - Remove Cerebellum and brainstem from the input volume
     ######################################################################################
     tmpCerebellumMask = slicer.vtkMRMLLabelMapVolumeNode()
@@ -1034,10 +1086,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
 
     if useAAD:
-      # Applying noise attenuation on Brainstem+Cerebellum image part. Due to small region, the parameters were adjusted following a empirical analysis.
-      #
-      # Step  - Noise attenuation
-      #
+      ######################################################################################
+      # Step  - Applying noise attenuation on Brainstem+Cerebellum image part. Due to small region, the parameters were adjusted following a empirical analysis.
+      ######################################################################################
       self.anisotropicAnomalousDiffusionFilter(tmpBrainstemCerebellumOnlyNode
                                                , tmpBrainstemCerebellumOnlyNode
                                                , 10
@@ -1069,9 +1120,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       # progressbar.labelText = "Image noise attenuation..."
 
     if useN4ITK:
-      #
+      ######################################################################################
       # Step  - Bias field correction - level 2 - Brainstem+Cerebellum
-      #
+      ######################################################################################
       self.biasFielCorretion(tmpBrainstemCerebellumOnlyNode
                              , tmpBrainstemCerebellumOnlyNode
                              , tmpBrainstemPlusCerebellumLabelOnlyNode
@@ -1081,9 +1132,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                              , voxelResampling)
       slicer.util.showStatusMessage("Bias field correction (second level for brainstem and cerebellum regions) is finished...")
 
-      #
-      # Step  - Bias field correction - level 2 - Brain hemispheres
-      #
+      ######################################################################################
+      # Step  - Bias field correction - level 2 - Brian hemispheres
+      ######################################################################################
       self.biasFielCorretion(tmpBrainOnlyNode
                              , tmpBrainOnlyNode
                              , maskVolume
@@ -1098,9 +1149,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     self.addVolumesTogether(tmpBrainOnlyNode, tmpBrainstemCerebellumOnlyNode, outputVolume)
 
     if useGlobalContrastEnhancement:
-      #
+      ######################################################################################
       # Step  - Global image contrast enhancement
-      #
+      ######################################################################################
       self.imageGlobalConstrastEnhancement(outputVolume
                                      , outputVolume
                                      , globalContrastEnhancement
@@ -1118,19 +1169,19 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     logging.info('Processing completed')
     slicer.util.showStatusMessage("Baby Brain Preparation is finished!")
 
-    ######################################################################################
+    #####################################################################################
     # Step  - Cleaning temporaty data (Debug mode: Off)
-    ######################################################################################
-    # slicer.mrmlScene.RemoveNode(brainAtlasNode)
-    # slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
-    # slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
-    # slicer.mrmlScene.RemoveNode(brainstemMaskNode)
-    # slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    #####################################################################################
+    slicer.mrmlScene.RemoveNode(brainAtlasNode)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
+    slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
+    slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
 
 
     home = expanduser("~")
-    tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
+    tmpFolder = home + "/tmpANTsBabyBrainSegmentation" # TODO Fazer pasta padrao para colocar os arquivos genericos do sujeito...BabyBrainSegmentation-NODE.GetName()
     os.system("rm -R " + tmpFolder)
 
     return True
@@ -1182,7 +1233,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       # Create scripts calling. Since the ANTs tools are only provided to Unix systems, the path pattern is fixed.
       home = expanduser("~")
       # Creating temporary folder in home directory
-      os.system("mkdir " + home + "/tmpANTsBabyBrainSegmentation")
+      os.system("mkdir " + home + "/tmpANTsBabyBrainSegmentation") # TODO Fazer pasta padrao para colocar os arquivos genericos do sujeito...BabyBrainSegmentation-NODE.GetName()...assim o usuraio pode salvar os aqquivos intermediarios...
       tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
 
       # Saving the subject image
@@ -1202,7 +1253,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
       # Reading registration tranforms
       (read, regTemplate1Warp) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_1Warp.nii.gz', True)
-      regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp")  # brain template to native space (SyN)
+      regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp")  # brain template to native space (SyN) # TODO Verificar erro nesta linha quando roda o module mais de uma vez!!!
       (read, regTemplate0GenericAffine) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_0GenericAffine.mat', True)
       regTemplate0GenericAffine.SetName("BabyBrain_regMNI2Native_0GenericAffine")  # brain template to native space (affine)
 
@@ -1249,6 +1300,21 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       params["pixelType"] = "float"
 
     slicer.cli.run(slicer.modules.brainsresample, None, params, wait_for_completion=True)
+
+  #
+  # Brain Volume Refinement
+  #
+  def brainVolumeRefinement(self, inputVolume
+                            , updatedVolume
+                            , neighborRadius
+                            , medianRadius):
+      params = {}
+      params["inputVolume"] = inputVolume.GetID()
+      params["updatedVolume"] = updatedVolume.GetID()
+      params["neighborRadius"] = neighborRadius
+      params["medianRadius"] = medianRadius
+
+      slicer.cli.run(slicer.modules.brainvolumerefinement, None, params, wait_for_completion=True)
 
   #
   # Combine Labels

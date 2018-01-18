@@ -24,16 +24,16 @@ class BabyBrainPreparation(ScriptedLoadableModule):
     self.parent.title = "Baby Brain Preparation"
     self.parent.categories = ["Segmentation.Baby Brain"]
     self.parent.dependencies = []
-    self.parent.contributors = ["Antonio Carlos da S. Senra Filho (University of Sao Paulo) and Sara"] # replace with "Firstname Lastname (Organization)"
+    self.parent.contributors = ["Antonio Carlos da S. Senra Filho (University of Sao Paulo)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
-This module offers a set of algorithms to biomedical image data preparation, which is focused for the neonate and fetal MRI analysis. The methods used here are
+This module offers a set of algorithms to biomedical image data preparation, which is focused for the neonatal and fetal MRI analysis. The methods used here are
  optimized to structural MRI images, namely T2 and T1, however, any kind of digital 3D images can be processed here (assuming a different set of parameters). 
  The general procedure assumes that the MRI image was already reconstructed in a volume representation and also brain extracted.  
  More details are found in the wikipage: https://www.slicer.org/wiki/Documentation/Nightly/Modules/BabyBrainPreparation
 """
     self.parent.helpText += self.getDefaultModuleDocumentationLink()
     self.parent.acknowledgementText = """
-This work was partially funded by CNPq grant ....
+This work was partially funded by CNPq grant 405574/2017-7
 """ # replace with organization, grant and thanks.
 
 #
@@ -113,15 +113,16 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Layout within the dummy collapsible button
     parametersEnhancementLayout = qt.QFormLayout(parametersEnhancementCollapsibleButton)
 
-    # #
-    # # Apply Image Space Resampling
-    # #
-    # self.setApplyImageResamplingBooleanWidget = ctk.ctkCheckBox()
-    # self.setApplyImageResamplingBooleanWidget.setChecked(True)
-    # self.setApplyImageResamplingBooleanWidget.setToolTip(
-    #   "Apply an image space resampling in the input image in order to reduce the total processing time. This is helpful for "
-    #   "image with large scale space (usually higher than 256^3 mm).")
-    # parametersEnhancementLayout.addRow("Apply Image Space Resampling", self.setApplyImageResamplingBooleanWidget)
+    #
+    # Apply Brain Volume Refinement
+    #
+    self.setApplyBrainVolumeRefinementBooleanWidget = ctk.ctkCheckBox()
+    self.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
+    self.setApplyBrainVolumeRefinementBooleanWidget.setToolTip(
+      "Check this if you want to refine the brain volume. This step can be helpful if the "
+      "brain extraction procedure left some non-brain tissues in the input image.")
+    parametersEnhancementLayout.addRow("Apply Brain Volume Refinement",
+                                                 self.setApplyBrainVolumeRefinementBooleanWidget)
 
     #
     # Apply AAD filtering
@@ -159,7 +160,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     #
     parametersImageResamplingCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersImageResamplingCollapsibleButton.text = "Image Space Resampling Parameters"
-    parametersImageResamplingCollapsibleButton.collapsed = True
+    parametersImageResamplingCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersImageResamplingCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -178,8 +179,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Interpolation Functions
     #
     self.setInterpolationFunctionComboBoxWidget = ctk.ctkComboBox()
-    self.setInterpolationFunctionComboBoxWidget.addItem("bspline")
     self.setInterpolationFunctionComboBoxWidget.addItem("linear")
+    self.setInterpolationFunctionComboBoxWidget.addItem("bspline")
     self.setInterpolationFunctionComboBoxWidget.addItem("nearestNeighbor")
     self.setInterpolationFunctionComboBoxWidget.addItem("hamming")
     self.setInterpolationFunctionComboBoxWidget.addItem("cosine")
@@ -191,75 +192,29 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     parametersImageResamplingLayout.addRow("Interpolation ", self.setInterpolationFunctionComboBoxWidget)
 
     #
-    # Brain Volume Refinement Parameters Area
-    #
-    parametersBrainVolumeRefinementCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersBrainVolumeRefinementCollapsibleButton.text = "Brain Volume Refinement Parameters"
-    parametersBrainVolumeRefinementCollapsibleButton.collapsed = True
-    self.layout.addWidget(parametersBrainVolumeRefinementCollapsibleButton)
-
-    # Layout within the dummy collapsible button
-    parametersBrainVolumeRefinementLayout = qt.QFormLayout(parametersBrainVolumeRefinementCollapsibleButton)
-
-    #
-    # Apply Brain Volume Refinement
-    #
-    self.setApplyBrainVolumeRefinementBooleanWidget = ctk.ctkCheckBox()
-    self.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
-    self.setApplyBrainVolumeRefinementBooleanWidget.setToolTip(
-      "Check this if you want to refine the brain volume using the atlas brain mask. This step can be helpful if the "
-      "brain extraction procedure left some non-brain tissues in the input image.")
-    parametersBrainVolumeRefinementLayout.addRow("Apply Brain Volume Refinement",
-                                                 self.setApplyBrainVolumeRefinementBooleanWidget)
-
-    #
-    # Neighborhood Radius
-    #
-    self.setNeighborhoodRadiusWidget = qt.QLineEdit()
-    self.setNeighborhoodRadiusWidget.setText('10,10,10')
-    self.setNeighborhoodRadiusWidget.setToolTip("A list of 3 values indicating the (x,y,z) size of the neighborhood. "
-                                                "This should large enough in order to get the bounderie tissues present in the "
-                                                "input image. The neighborhood is running over the contour of the input mask."
-                                                " Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).")
-    parametersBrainVolumeRefinementLayout.addRow("Neighborhood Radius", self.setNeighborhoodRadiusWidget)
-
-    #
-    # Second Layer (Median Filtering) Radius
-    #
-    self.setSecondLayerMedianRadiusWidget = qt.QLineEdit()
-    self.setSecondLayerMedianRadiusWidget.setText('5,5,5')
-    self.setSecondLayerMedianRadiusWidget.setToolTip(
-      "A list of 3 values indicating the (x,y,z) size of the neighborhood used in "
-      "the second layer of the brain volume estimate. This parameter is responsible"
-      "to smooth fine details in the brain volume, which is usually smaller than the "
-      "first layer neighborhood radius size.")
-    parametersBrainVolumeRefinementLayout.addRow("Second Layer Neighborhood Radius",
-                                                 self.setSecondLayerMedianRadiusWidget)
-
-    #
     # Atlas Propagation Parameters Area
     #
     parametersAtlasPropagationCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersAtlasPropagationCollapsibleButton.text = "Atlas Propagation Parameters"
-    parametersAtlasPropagationCollapsibleButton.collapsed = True
+    parametersAtlasPropagationCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersAtlasPropagationCollapsibleButton)
 
     # Layout within the dummy collapsible button
     parametersAtlasPropagationLayout = qt.QFormLayout(parametersAtlasPropagationCollapsibleButton)
 
-
     #
     # Brain Atlas
     #
     self.setBrainAtlasComboBoxWidget = ctk.ctkComboBox()
-    self.setBrainAtlasComboBoxWidget.addItem("NEO2012")  # TODO Ver se usa tambem outro template (2015, http://brain-development.org/brain-atlases/multi-structural-neonatal-brain-atlas/)
+    self.setBrainAtlasComboBoxWidget.addItem(
+      "NEO2012")  # TODO Ver se usa tambem outro template (2015, http://brain-development.org/brain-atlases/multi-structural-neonatal-brain-atlas/)
     # self.setBrainAtlasComboBoxWidget.addItem("NEO2015") # TODO Novo brain atlas com o mesmo padrao do NEO2012... tem mais detalhes de segmentacao
     self.setBrainAtlasComboBoxWidget.addItem("FET2012")  # TODO Preparar cerebellum e brainstem.
     # self.setBrainAtlasComboBoxWidget.addItem("PED2008") # TODO PED2008 precisa separar todas as areas... ver se realmente precisa para agora ou deixa para UPGRADE
     self.setBrainAtlasComboBoxWidget.setToolTip(
-        "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
-        "binary labels are considered. These brain atlases will mainly help to segment the cerebellum, brainstem and deep"
-        "gray matter. Available atlases: NEO2012 (Neonatal), FET2012 (Fetal) and PED2008 (Pediatric).")
+      "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
+      "binary labels are considered. These brain atlases will mainly help to segment the cerebellum, brainstem and deep"
+      "gray matter. Available atlases: NEO2012 (Neonatal), FET2012 (Fetal) and PED2008 (Pediatric).")
     parametersAtlasPropagationLayout.addRow("Brain Atlas ", self.setBrainAtlasComboBoxWidget)
 
     #
@@ -271,9 +226,9 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setSubjectAgeIntegerWidget.value = 26
     self.setSubjectAgeIntegerWidget.singleStep = 1
     self.setSubjectAgeIntegerWidget.setToolTip(
-        "Select the subject's age in weeks. This is only used for neonatal and fetal brain atlases. "
-        "NOTE: Each atlas has its own age range, with NEO2012=27-44 and FET2012=23-37 weeks, respectivelly."
-        "If you choose an age below (above), the lower (higher) age will be chosen.")
+      "Select the subject's age in weeks. This is only used for neonatal and fetal brain atlases. "
+      "NOTE: Each atlas has its own age range, with NEO2012=27-44 and FET2012=23-37 weeks, respectivelly."
+      "If you choose an age below (above), the lower (higher) age will be chosen.")
     parametersAtlasPropagationLayout.addRow("Age ", self.setSubjectAgeIntegerWidget)
 
     #
@@ -286,12 +241,12 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setRadioBRAINS.setToolTip("Use the Slicer built-in BRAINSFit algorithm (General Registration).")
     self.setRadioANTs = qt.QRadioButton('ANTs')
     self.setRadioANTs.setToolTip(
-        "Use the ANTs SyN diffeomorphic algorithm (recommended). If the ANTs tools are not installed in the user's machine, than this option will be not available.")
+      "Use the ANTs SyN diffeomorphic algorithm (recommended). If the ANTs tools are not installed in the user's machine, than this option will be not available.")
     if os.environ.get('ANTSPATH'):
-        self.setRadioANTs.setChecked(True)
+      self.setRadioANTs.setChecked(True)
     else:
-        self.setRadioBRAINS.setChecked(True)
-        self.setRadioANTs.setDisabled(True)
+      self.setRadioBRAINS.setChecked(True)
+      self.setRadioANTs.setDisabled(True)
     RadioButtonLayout.addRow(self.setRadioBRAINS)
     RadioButtonLayout.addRow(self.setRadioANTs)
 
@@ -310,8 +265,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setUseANTSQuickBooleanWidget = ctk.ctkCheckBox()
     self.setUseANTSQuickBooleanWidget.setChecked(False)
     self.setUseANTSQuickBooleanWidget.setToolTip(
-        "Check this if you want to use the antsRegistrationSyNQuick.sh script. This will considerably reduce the "
-        "total time required in the registration step.")
+      "Check this if you want to use the antsRegistrationSyNQuick.sh script. This will considerably reduce the "
+      "total time required in the registration step.")
 
     #
     # Number of Cores
@@ -322,7 +277,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setNumberOfCoresWidget.maximum = multiprocessing.cpu_count()
     self.setNumberOfCoresWidget.value = self.setNumberOfCoresWidget.maximum - 1
     self.setNumberOfCoresWidget.setToolTip(
-        "Set the number of CPU's used in the registration process. In order to prevent the SO crash, it is advisable to use N - 1 (N = Total number of cores available).")
+      "Set the number of CPU's used in the registration process. In order to prevent the SO crash, it is advisable to use N - 1 (N = Total number of cores available).")
 
     #
     # Radius for correlation calculation
@@ -332,7 +287,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setCorrelationRadiusWidget.setMaximum(30)
     self.setCorrelationRadiusWidget.setValue(4)
     self.setCorrelationRadiusWidget.setToolTip(
-        "Set the radius for cross correlation metric used in the SyN registration. Units given in number of voxels.")
+      "Set the radius for cross correlation metric used in the SyN registration. Units given in number of voxels.")
 
     ANTsParametersLayout.addRow("Use Quick Registration ", self.setUseANTSQuickBooleanWidget)
     ANTsParametersLayout.addRow("Number Of Cores ", self.setNumberOfCoresWidget)
@@ -374,7 +329,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setInitiationRegistrationBooleanWidget.addItem("useCenterOfHeadAlign")
     self.setInitiationRegistrationBooleanWidget.addItem("useGeometryAlign")
     self.setInitiationRegistrationBooleanWidget.setToolTip(
-        "Initialization method used for the MNI152 registration.")
+      "Initialization method used for the MNI152 registration.")
 
     #
     # Cost Metric
@@ -384,8 +339,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setRegistrationCostMetricWidget.addItem("MMI")
     self.setRegistrationCostMetricWidget.addItem("MSE")
     self.setRegistrationCostMetricWidget.setToolTip(
-        "The cost metric to be used during fitting. Defaults to NC. Options are MMI (Mattes Mutual Information), MSE (Mean Square Error), NC"
-        " (Normalized Correlation).")
+      "The cost metric to be used during fitting. Defaults to NC. Options are MMI (Mattes Mutual Information), MSE (Mean Square Error), NC"
+      " (Normalized Correlation).")
 
     #
     # Interpolation
@@ -401,7 +356,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Blackman")
     self.setInterpolationFunctionRegistrationComboBoxWidget.addItem("Hamming")
     self.setInterpolationFunctionRegistrationComboBoxWidget.setToolTip(
-        "Interpolation functions for registration step.")
+      "Interpolation functions for registration step.")
 
     BRAINSFitParametersLayout.addRow("Percentage Of Samples ", self.setPercSamplingQWidget)
     BRAINSFitParametersLayout.addRow("Spline Grid ", self.setBSplineGridWidget)
@@ -410,6 +365,42 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     BRAINSFitParametersLayout.addRow("Interpolation ", self.setInterpolationFunctionRegistrationComboBoxWidget)
 
     parametersAtlasPropagationLayout.addRow(self.groupBRAINFitParametersBoxButtons)
+
+    #
+    # Brain Volume Refinement Parameters Area
+    #
+    parametersBrainVolumeRefinementCollapsibleButton = ctk.ctkCollapsibleButton()
+    parametersBrainVolumeRefinementCollapsibleButton.text = "Brain Volume Refinement Parameters"
+    parametersBrainVolumeRefinementCollapsibleButton.collapsed = True
+    self.layout.addWidget(parametersBrainVolumeRefinementCollapsibleButton)
+
+    # Layout within the dummy collapsible button
+    parametersBrainVolumeRefinementLayout = qt.QFormLayout(parametersBrainVolumeRefinementCollapsibleButton)
+
+    #
+    # Neighborhood Radius
+    #
+    self.setNeighborhoodRadiusWidget = qt.QLineEdit()
+    self.setNeighborhoodRadiusWidget.setText('10,10,10')
+    self.setNeighborhoodRadiusWidget.setToolTip("A list of 3 values indicating the (x,y,z) size of the neighborhood. "
+                                                "This should large enough in order to get the bounderie tissues present in the "
+                                                "input image. The neighborhood is running over the contour of the input mask."
+                                                " Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).")
+    parametersBrainVolumeRefinementLayout.addRow("Neighborhood Radius", self.setNeighborhoodRadiusWidget)
+
+    #
+    # Second Layer (Median Filtering) Radius
+    #
+    self.setSecondLayerMedianRadiusWidget = qt.QLineEdit()
+    self.setSecondLayerMedianRadiusWidget.setText('5,5,5')
+    self.setSecondLayerMedianRadiusWidget.setToolTip(
+      "A list of 3 values indicating the (x,y,z) size of the neighborhood used in "
+      "the second layer of the brain volume estimate. This parameter is responsible"
+      "to smooth fine details in the brain volume, which is usually smaller than the "
+      "first layer neighborhood radius size.")
+    parametersBrainVolumeRefinementLayout.addRow("Second Layer Neighborhood Radius",
+                                                 self.setSecondLayerMedianRadiusWidget)
+
 
 
 
@@ -563,7 +554,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     #
     self.setShrinkFactorFirstLevelWidget = qt.QSpinBox()
     self.setShrinkFactorFirstLevelWidget.setMinimum(1)
-    self.setShrinkFactorFirstLevelWidget.setMaximum(30)
+    self.setShrinkFactorFirstLevelWidget.setMaximum(10)
     self.setShrinkFactorFirstLevelWidget.setValue(4)
     self.setShrinkFactorFirstLevelWidget.setToolTip(
       "Defines how much the image should be upsampled before estimating the inhomogeneity field. Increase if you want to reduce the execution"
@@ -576,8 +567,8 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     #
     self.setShrinkFactorSecondLevelWidget = qt.QSpinBox()
     self.setShrinkFactorSecondLevelWidget.setMinimum(1)
-    self.setShrinkFactorSecondLevelWidget.setMaximum(30)
-    self.setShrinkFactorSecondLevelWidget.setValue(2)
+    self.setShrinkFactorSecondLevelWidget.setMaximum(10)
+    self.setShrinkFactorSecondLevelWidget.setValue(1)
     self.setShrinkFactorSecondLevelWidget.setToolTip(
       "The same as in Shrink Factor (First Level).")
     parametersBiasCorrectionLayout.addRow("Shrink Factor (Second Level) ", self.setShrinkFactorSecondLevelWidget)
@@ -698,7 +689,6 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     initMethod = self.setInitiationRegistrationBooleanWidget.currentText
     costMetric = self.setRegistrationCostMetricWidget.currentText
     interpolationRegistration = self.setInterpolationFunctionRegistrationComboBoxWidget.currentText
-    # useResampling = self.setApplyImageResamplingBooleanWidget.isChecked()
     useAAD = self.setApplyAADBooleanWidget.isChecked()
     useN4ITK = self.setApplyBiasCorrectionBooleanWidget.isChecked()
     useGlobalContrastEnhancement = self.setApplyGlobalEnhancementBooleanWidget.isChecked()
@@ -857,7 +847,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     logging.info('Processing started')
 
     # Copying the input node into the output node in order to apply the changes in the image and not changing the input data
-    volumesLogic = slicer.modules.volumes.logic()
+    # volumesLogic = slicer.modules.volumes.logic()
     # volumesLogic.CreateScalarVolumeFromVolume(slicer.mrmlScene, outputVolume, inputVolume)
     # clonedInput = volumesLogic.CloneVolume(slicer.mrmlScene, inputVolume, "input_preprocessed")
 
@@ -965,12 +955,22 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       slicer.mrmlScene.RemoveNode(regMNI2NativeLinearTransform)
       slicer.mrmlScene.RemoveNode(regMNI2NativeBSplineTransform)
 
+    # Approach to find the newest transformation in the Slicer scene. This is helpful to run the code more than once.
+    regAffine = slicer.util.getNodes('BabyBrain_regMNI2Native_0GenericAffine*')
+    for t in regAffine:
+        regAffine = t
+    regAffine=slicer.util.getNode(regAffine)
+    regWarp = slicer.util.getNodes('BabyBrain_regMNI2Native_1Warp*')
+    for t in regWarp:
+        regWarp = t
+    regWarp=slicer.util.getNode(regWarp)
+
     slicer.util.showStatusMessage("Atlas propagation is finished...")
 
     ######################################################################################
     # Applying brain volume refinement
     ######################################################################################
-    if applyBrainVolumeRefinements:
+    if applyBrainVolumeRefinements: # TODO Aparecem buracos na imagem! ver como o fill holes funciona melhor...tem como aproximar mais as bordas do CSF?
       self.brainVolumeRefinement(outputVolume
                                  , outputVolume
                                  , neighborhoodFirstLevelRadius
@@ -1011,8 +1011,8 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                      , cerebellumMaskNode
                                      , outputVolume
                                      , tmpCerebellumMask
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , regAffine
+                                     , regWarp
                                      , True)
 
     tmpBrainstemMask = slicer.vtkMRMLLabelMapVolumeNode()
@@ -1046,8 +1046,8 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
                                      , brainstemMaskNode
                                      , outputVolume
                                      , tmpBrainstemMask
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_0GenericAffine")
-                                     , slicer.util.getNode("BabyBrain_regMNI2Native_1Warp")
+                                     , regAffine
+                                     , regWarp
                                      , True)
 
     # Removing brainstem and cerebellum from the input image
@@ -1084,10 +1084,22 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.AddNode(tmpBrainstemCerebellumOnlyNode)
     sitkUtils.PushVolumeToSlicer(output_brainstemCerebellumOnly_Image, tmpBrainstemCerebellumOnlyNode)
 
+    # Creating a brain only mask
+    # inputImage = sitkUtils.PullVolumeFromSlicer(outputVolume)
+    brainOnlyImage = sitkUtils.PullVolumeFromSlicer(tmpBrainOnlyNode)
+    filter = sitk.BinaryThresholdImageFilter()
+    output_brainOnly_Image = filter.Execute(brainOnlyImage, 1.0, 100000.0, 1, 0)
+
+    tmpBrainOnlyMask = slicer.vtkMRMLLabelMapVolumeNode()
+    tmpBrainOnlyMask.SetName("resampled_brainOnly_mask")
+    slicer.mrmlScene.AddNode(tmpBrainOnlyMask)
+    sitkUtils.PushVolumeToSlicer(output_brainOnly_Image, tmpBrainOnlyMask)
+
 
     if useAAD:
       ######################################################################################
-      # Step  - Applying noise attenuation on Brainstem+Cerebellum image part. Due to small region, the parameters were adjusted following a empirical analysis.
+      # Step  - Applying noise attenuation on Brainstem+Cerebellum image part.
+      # Due to small region, the parameters were adjusted following a empirical analysis.
       ######################################################################################
       self.anisotropicAnomalousDiffusionFilter(tmpBrainstemCerebellumOnlyNode
                                                , tmpBrainstemCerebellumOnlyNode
@@ -1133,11 +1145,11 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       slicer.util.showStatusMessage("Bias field correction (second level for brainstem and cerebellum regions) is finished...")
 
       ######################################################################################
-      # Step  - Bias field correction - level 2 - Brian hemispheres
+      # Step  - Bias field correction - level 2 - Brain hemispheres
       ######################################################################################
       self.biasFielCorretion(tmpBrainOnlyNode
                              , tmpBrainOnlyNode
-                             , maskVolume
+                             , tmpBrainOnlyMask
                              , splineGrid_2
                              , shrinkFactor_2
                              , True
@@ -1170,19 +1182,22 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
     slicer.util.showStatusMessage("Baby Brain Preparation is finished!")
 
     #####################################################################################
-    # Step  - Cleaning temporaty data (Debug mode: Off)
+    # Step  - Cleaning temporaty data
     #####################################################################################
     slicer.mrmlScene.RemoveNode(brainAtlasNode)
     slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
     slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
     slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
     slicer.mrmlScene.RemoveNode(brainstemMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemPlusCerebellumLabelOnlyNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemCerebellumOnlyNode)
     slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainOnlyMask)
 
-
-    home = expanduser("~")
-    tmpFolder = home + "/tmpANTsBabyBrainSegmentation" # TODO Fazer pasta padrao para colocar os arquivos genericos do sujeito...BabyBrainSegmentation-NODE.GetName()
-    os.system("rm -R " + tmpFolder)
+    if registrationAlgorithm == "ANTs":
+      home = expanduser("~")
+      tmpFolder = home + "/tmpANTsBabyBrainPreparation"
+      os.system("rm -R " + tmpFolder)
 
     return True
 
@@ -1233,8 +1248,8 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       # Create scripts calling. Since the ANTs tools are only provided to Unix systems, the path pattern is fixed.
       home = expanduser("~")
       # Creating temporary folder in home directory
-      os.system("mkdir " + home + "/tmpANTsBabyBrainSegmentation") # TODO Fazer pasta padrao para colocar os arquivos genericos do sujeito...BabyBrainSegmentation-NODE.GetName()...assim o usuraio pode salvar os aqquivos intermediarios...
-      tmpFolder = home + "/tmpANTsBabyBrainSegmentation"
+      os.system("mkdir " + home + "/tmpANTsBabyBrainPreparation")
+      tmpFolder = home + "/tmpANTsBabyBrainPreparation"
 
       # Saving the subject image
       slicer.util.saveNode(fixedNode, tmpFolder + '/subject.nii.gz')
@@ -1253,9 +1268,9 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
 
       # Reading registration tranforms
       (read, regTemplate1Warp) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_1Warp.nii.gz', True)
-      regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp")  # brain template to native space (SyN) # TODO Verificar erro nesta linha quando roda o module mais de uma vez!!!
+      # regTemplate1Warp.SetName("BabyBrain_regMNI2Native_1Warp")  # brain template to native space (SyN) # TODO Verificar erro nesta linha quando roda o module mais de uma vez!!!
       (read, regTemplate0GenericAffine) = slicer.util.loadTransform(tmpFolder + '/BabyBrain_regMNI2Native_0GenericAffine.mat', True)
-      regTemplate0GenericAffine.SetName("BabyBrain_regMNI2Native_0GenericAffine")  # brain template to native space (affine)
+      # regTemplate0GenericAffine.SetName("BabyBrain_regMNI2Native_0GenericAffine")  # brain template to native space (affine)
 
       # Removing files from the modules path
       # os.system("rm -R " + tmpFolder)

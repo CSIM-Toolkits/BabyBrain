@@ -36,14 +36,6 @@
   <parameters>
   <label>Brain Volume Refinement Parameters</label>
     <description><![CDATA[Brain volume refinement parameters]]></description>
-    <integer>
-      <name>foregroundValue</name>
-      <longflag>--foregroundValue</longflag>
-      <flag>f</flag>
-      <label>Foreground Value</label>
-      <description><![CDATA[An integer value that defines the label mask value that shoulb be adopted. This is useful for a multilabel input.]]></description>
-      <default>1</default>
-    </integer>
     <integer-vector>
       <name>neighborRadius</name>
       <longflag>--neighborRadius</longflag>

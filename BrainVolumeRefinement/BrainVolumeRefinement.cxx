@@ -52,7 +52,7 @@ int DoIt( int argc, char * argv[], TPixel )
     estimateMask->SetInput(inputReader->GetOutput());
     estimateMask->SetLowerThreshold(1.0);
     estimateMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
-    estimateMask->SetInsideValue(foregroundValue);
+    estimateMask->SetInsideValue( 1 );
 
     // Create volume contour from the input mask
     std::cout<<"Creating volume contour from the input mask..."<<std::endl;
@@ -60,10 +60,10 @@ int DoIt( int argc, char * argv[], TPixel )
     typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
 
     maskContour->SetInput(estimateMask->GetOutput());
-    maskContour->SetForegroundValue( foregroundValue );
+    maskContour->SetForegroundValue( 1 );
     maskContour->Update();
 
-        typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>  BinaryThinningType;
+    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>  BinaryThinningType;
     typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
     skeleton->SetInput(maskContour->GetOutput());
     skeleton->Update();
@@ -106,7 +106,7 @@ int DoIt( int argc, char * argv[], TPixel )
     gradIt.GoToBegin();
     updateIt.GoToBegin();
 
-    int N = (neighborRadius[0]*2 + 1)*(neighborRadius[1]*2 + 1)*(neighborRadius[2]*2 + 1);
+    unsigned int N = (neighborRadius[0]*2 + 1)*(neighborRadius[1]*2 + 1)*(neighborRadius[2]*2 + 1);
     InputPixelType meanGrad, meanIntensity;
     while (!imageIt.IsAtEnd()) {
         if (contourIt.Get()!=static_cast<LabelPixelType>(0)) {
@@ -121,7 +121,7 @@ int DoIt( int argc, char * argv[], TPixel )
             meanIntensity/=N;
 
             //Cutting out voxels that does not belongs to the brain based on the mean of the local gradient and mean gray level intensity
-            for (int p = 0; p < N; p++) {
+            for (unsigned int p = 0; p < N; p++) {
                 if (imageIt.GetPixel(p)!=0) {
                     if (gradIt.GetPixel(p) < (meanGrad) && imageIt.GetPixel(p) < (meanIntensity)){
                         updateIt.SetPixel(p, 0);
@@ -158,23 +158,23 @@ int DoIt( int argc, char * argv[], TPixel )
     //Filling in the holes in the updated brain mask
     std::cout<<"Filling in the holes in the updated brain mask..."<<std::endl;
     typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType > VotingFillInType;
-     typename VotingFillInType::InputSizeType vRadius;
+    typename VotingFillInType::InputSizeType vRadius;
 
     //Finding the bigger size of the median filter
-    int r = 0.0;
-    for (int i = 0; i < Dimension; ++i) {
+    int r = 0;
+    for (unsigned int i = 0; i < Dimension; ++i) {
         if (medianRadius[i]>r) {
             r=medianRadius[i];
         }
     }
-      vRadius.Fill( r );
-     typename VotingFillInType::Pointer fillInHoles = VotingFillInType::New();
-      fillInHoles->SetInput( median->GetOutput() );
-      fillInHoles->SetRadius( vRadius );
-      fillInHoles->SetMajorityThreshold( majorityThreshold );
-      fillInHoles->SetBackgroundValue( 0 );
-      fillInHoles->SetForegroundValue( 1 );
-      fillInHoles->SetMaximumNumberOfIterations( numberOfIterations );
+    vRadius.Fill( r );
+    typename VotingFillInType::Pointer fillInHoles = VotingFillInType::New();
+    fillInHoles->SetInput( median->GetOutput() );
+    fillInHoles->SetRadius( vRadius );
+    fillInHoles->SetMajorityThreshold( majorityThreshold );
+    fillInHoles->SetBackgroundValue( 0 );
+    fillInHoles->SetForegroundValue( 1 );
+    fillInHoles->SetMaximumNumberOfIterations( numberOfIterations );
 
     //Masking the input image with the corrected brain mask
     std::cout<<"Masking the input image with the corrected brain mask..."<<std::endl;
@@ -198,7 +198,7 @@ int DoIt( int argc, char * argv[], TPixel )
         typedef itk::ImageFileWriter<LabelImageType> WriterType;
         typename WriterType::Pointer labelWriter = WriterType::New();
         labelWriter->SetFileName( updatedMask.c_str() );
-        labelWriter->SetInput( median->GetOutput() );
+        labelWriter->SetInput( fillInHoles->GetOutput() );
         labelWriter->SetUseCompression(1);
         labelWriter->Update();
     }

@@ -1,5 +1,7 @@
 #include "itkImageFileWriter.h"
 
+#include "itkConnectedComponentImageFilter.h"
+#include "itkRelabelComponentImageFilter.h"
 #include "itkBinaryThresholdImageFilter.h"
 #include "itkBinaryThinningImageFilter.h"
 #include "itkBinaryContourImageFilter.h"
@@ -46,13 +48,16 @@ int DoIt( int argc, char * argv[], TPixel )
     inputReader->SetFileName( inputVolume.c_str() );
     inputReader->Update();
 
-    typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType> BinaryThresholdType;
-    typedef itk::BinaryContourImageFilter<LabelImageType, LabelImageType>   BinaryContourType;
-    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>  BinaryThinningType;
-    typedef itk::GradientMagnitudeImageFilter<InputImageType, InputImageType> GradientMagnitudeType;
-    typedef itk::MedianImageFilter<LabelImageType, LabelImageType>  MedianFilterType;
-    typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType > VotingFillInType;
-    typedef itk::MaskImageFilter<InputImageType, LabelImageType>    MaskFilterType;
+    typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType>             BinaryThresholdType;
+    typedef itk::BinaryContourImageFilter<LabelImageType, LabelImageType>               BinaryContourType;
+    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>              BinaryThinningType;
+    typedef itk::GradientMagnitudeImageFilter<InputImageType, InputImageType>           GradientMagnitudeType;
+    typedef itk::MedianImageFilter<LabelImageType, LabelImageType>                      MedianFilterType;
+    typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType >          VotingFillInType;
+    typedef itk::ConnectedComponentImageFilter<LabelImageType, LabelImageType>          ConnectedLabelType;
+    typedef itk::RelabelComponentImageFilter<LabelImageType, LabelImageType>            RelabelerType;
+    typedef itk::BinaryThresholdImageFilter<LabelImageType,LabelImageType>              BinaryLabelMap;
+    typedef itk::MaskImageFilter<InputImageType, LabelImageType>                        MaskFilterType;
 
 
     // Copying information and pixel values from the input image
@@ -96,6 +101,9 @@ int DoIt( int argc, char * argv[], TPixel )
         typename BinaryThresholdType::Pointer newMask = BinaryThresholdType::New();
         typename MedianFilterType::Pointer median = MedianFilterType::New();
         typename VotingFillInType::Pointer fillInHoles = VotingFillInType::New();
+        typename ConnectedLabelType::Pointer connLabel = ConnectedLabelType::New();
+        typename RelabelerType::Pointer relabel = RelabelerType::New();
+        typename BinaryLabelMap::Pointer connectedMask = BinaryLabelMap::New();
         typename MaskFilterType::Pointer maskInput = MaskFilterType::New();
 
         typename LabelImageType::SizeType radius;
@@ -114,6 +122,8 @@ int DoIt( int argc, char * argv[], TPixel )
         maskContour->SetForegroundValue( 1 );
         maskContour->Update();
 
+//        TODO Fazer a subtracao do contorno anterior...assim ele nao passa nas regioes onde ficou estavel
+//        TODO Tirar alguns passos do countour iterator (passar para neighborhood iterator) pode ajudar na reducao do tempo...pode colocar uma variavel a mais so para fazer isso
         skeleton->SetInput(maskContour->GetOutput());
         skeleton->Update();
 
@@ -196,14 +206,25 @@ int DoIt( int argc, char * argv[], TPixel )
         fillInHoles->SetMajorityThreshold( majorityThreshold );
         fillInHoles->SetBackgroundValue( 0 );
         fillInHoles->SetForegroundValue( 1 );
-        fillInHoles->SetMaximumNumberOfIterations( 10 ); // a default number of iterations to a general case
+        fillInHoles->SetMaximumNumberOfIterations( 100 ); // a default number of iterations to a general case
+
+        //Removing non-connected regions left in the brain mask
+        connLabel->SetInput(fillInHoles->GetOutput());
+        connLabel->Update();
+
+        relabel->SetInput(connLabel->GetOutput());
+        relabel->SetSortByObjectSize(true);
+        relabel->Update();
+
+        connectedMask->SetInput(relabel->GetOutput());
+        connectedMask->SetLowerThreshold(1);
+        connectedMask->SetUpperThreshold(1);
+        connectedMask->SetInsideValue(1);
 
         //Masking the input image with the corrected brain mask
         maskInput->SetInput(updatedImage);
-        maskInput->SetMaskImage(fillInHoles->GetOutput());
+        maskInput->SetMaskImage(connectedMask->GetOutput());
         maskInput->Update();
-
-
 
         itk::ImageRegionIterator<InputImageType>    inIt(maskInput->GetOutput(), maskInput->GetOutput()->GetRequestedRegion());
         itk::ImageRegionIterator<InputImageType>    upIt(updatedImage, updatedImage->GetRequestedRegion());
@@ -220,11 +241,11 @@ int DoIt( int argc, char * argv[], TPixel )
         }
 
         if (updatedMask!="" && n == numberOfIterations-1) {
-            std::cout<<"Output updated mask with less non-brain tissues at location: "<<updatedMask.c_str()<<std::endl;
+
             typedef itk::ImageFileWriter<LabelImageType> WriterType;
             typename WriterType::Pointer labelWriter = WriterType::New();
             labelWriter->SetFileName( updatedMask.c_str() );
-            labelWriter->SetInput( fillInHoles->GetOutput() );
+            labelWriter->SetInput( connectedMask->GetOutput() );
             labelWriter->SetUseCompression(1);
             labelWriter->Update();
         }
@@ -235,6 +256,9 @@ int DoIt( int argc, char * argv[], TPixel )
 
     // Output updated image with less non-brain tissues
     std::cout<<"Output updated image with less non-brain tissues at location: "<<updatedVolume.c_str()<<std::endl;
+    if (updatedMask!=""){
+        std::cout<<"Output updated mask with less non-brain tissues at location: "<<updatedMask.c_str()<<std::endl;
+    }
     typedef itk::ImageFileWriter<InputImageType> WriterType;
     typename WriterType::Pointer imageWriter = WriterType::New();
     imageWriter->SetFileName( updatedVolume.c_str() );

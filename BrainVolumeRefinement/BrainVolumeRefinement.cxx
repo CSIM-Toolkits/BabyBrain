@@ -16,6 +16,8 @@
 
 #include "BrainVolumeRefinementCLP.h"
 
+
+#include <sstream>
 // Use an anonymous namespace to keep class types and function names
 // from colliding when module is used as shared object module.  Every
 // thing should be in an anonymous namespace except for the module
@@ -45,36 +47,15 @@ int DoIt( int argc, char * argv[], TPixel )
     inputReader->Update();
 
     typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType> BinaryThresholdType;
-    typename BinaryThresholdType::Pointer estimateMask = BinaryThresholdType::New();
-
-    //Making mask of the input volume
-    std::cout<<"Making mask of the input volume..."<<std::endl;
-    estimateMask->SetInput(inputReader->GetOutput());
-    estimateMask->SetLowerThreshold(1.0);
-    estimateMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
-    estimateMask->SetInsideValue( 1 );
-
-    // Create volume contour from the input mask
-    std::cout<<"Creating volume contour from the input mask..."<<std::endl;
     typedef itk::BinaryContourImageFilter<LabelImageType, LabelImageType>   BinaryContourType;
-    typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
-
-    maskContour->SetInput(estimateMask->GetOutput());
-    maskContour->SetForegroundValue( 1 );
-    maskContour->Update();
-
     typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>  BinaryThinningType;
-    typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
-    skeleton->SetInput(maskContour->GetOutput());
-    skeleton->Update();
-
-    // Run through the image gradient (using the countour) in order to find its boundaries
-    std::cout<<"Running through the image gradient (using the countour) in order to find its boundaries..."<<std::endl;
     typedef itk::GradientMagnitudeImageFilter<InputImageType, InputImageType> GradientMagnitudeType;
-    typename GradientMagnitudeType::Pointer inputGrad = GradientMagnitudeType::New();
-    inputGrad->SetInput(inputReader->GetOutput());
-    inputGrad->Update();
+    typedef itk::MedianImageFilter<LabelImageType, LabelImageType>  MedianFilterType;
+    typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType > VotingFillInType;
+    typedef itk::MaskImageFilter<InputImageType, LabelImageType>    MaskFilterType;
 
+
+    // Copying information and pixel values from the input image
     typename InputImageType::Pointer updatedImage = InputImageType::New();
     updatedImage->CopyInformation(inputReader->GetOutput());
     updatedImage->SetRegions(inputReader->GetOutput()->GetRequestedRegion());
@@ -90,118 +71,178 @@ int DoIt( int argc, char * argv[], TPixel )
         ++inIt;
     }
 
-    typename LabelImageType::SizeType radius;
-    radius[0] = neighborRadius[0];
-    radius[1] = neighborRadius[1];
-    radius[2] = neighborRadius[2];
-    itk::ImageRegionIterator<LabelImageType> contourIt(skeleton->GetOutput(),skeleton->GetOutput()->GetRequestedRegion());
-    itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > imageIt(radius, inputReader->GetOutput(),inputReader->GetOutput()->GetRequestedRegion());
-    itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > gradIt(radius, inputGrad->GetOutput(),inputGrad->GetOutput()->GetRequestedRegion());
-    itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > updateIt(radius, updatedImage,updatedImage->GetRequestedRegion());
+    typename InputImageType::Pointer auxImage = InputImageType::New();
+    auxImage->CopyInformation(inputReader->GetOutput());
+    auxImage->SetRegions(inputReader->GetOutput()->GetRequestedRegion());
+    auxImage->Allocate();
+    auxImage->FillBuffer(0);
+    itk::ImageRegionIterator<InputImageType>    auxIt(auxImage, auxImage->GetRequestedRegion());
+    auxIt.GoToBegin();
+    inIt.GoToBegin();
+    while (!auxIt.IsAtEnd()) {
+        auxIt.Set(inIt.Get());
+        ++auxIt;
+        ++inIt;
+    }
 
-    // Running over the both image and mask contour in order to find the closest voxel in the brain tissue.
-    std::cout<<"Running over the both image and mask contour in order to find the closest voxel in the brain tissue..."<<std::endl;
-    contourIt.GoToBegin();
-    imageIt.GoToBegin();
-    gradIt.GoToBegin();
-    updateIt.GoToBegin();
+    std::cout<<"*********************"<<std::endl;
+    std::cout<<"BrainVolumeRefinement: Initiated"<<std::endl;
+    std::cout<<"Iteration: ";
+    for (int n = 0; n < numberOfIterations; ++n) {
+        typename BinaryThresholdType::Pointer estimateMask = BinaryThresholdType::New();
+        typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
+        typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
+        typename GradientMagnitudeType::Pointer inputGrad = GradientMagnitudeType::New();
+        typename BinaryThresholdType::Pointer newMask = BinaryThresholdType::New();
+        typename MedianFilterType::Pointer median = MedianFilterType::New();
+        typename VotingFillInType::Pointer fillInHoles = VotingFillInType::New();
+        typename MaskFilterType::Pointer maskInput = MaskFilterType::New();
 
-    unsigned int N = (neighborRadius[0]*2 + 1)*(neighborRadius[1]*2 + 1)*(neighborRadius[2]*2 + 1);
-    InputPixelType meanGrad, meanIntensity;
-    while (!imageIt.IsAtEnd()) {
-        if (contourIt.Get()!=static_cast<LabelPixelType>(0)) {
-            //Calculating statistics into the neighborhood
-            meanGrad=0.0;
-            meanIntensity=0.0;
-            for (unsigned int p = 0; p < N; p++) {
-                meanGrad += gradIt.GetPixel(p);
-                meanIntensity += imageIt.GetPixel(p);
-            }
-            meanGrad/=N;
-            meanIntensity/=N;
+        typename LabelImageType::SizeType radius;
+        typename VotingFillInType::InputSizeType vRadius;
 
-            //Cutting out voxels that does not belongs to the brain based on the mean of the local gradient and mean gray level intensity
-            for (unsigned int p = 0; p < N; p++) {
-                if (imageIt.GetPixel(p)!=0) {
-                    if (gradIt.GetPixel(p) < (meanGrad) && imageIt.GetPixel(p) < (meanIntensity)){
-                        updateIt.SetPixel(p, 0);
+        //Making mask of the input volume
+        std::cout<<(n+1)<<"..."<<std::flush;
+        estimateMask->SetInput(updatedImage);
+        estimateMask->SetLowerThreshold(1.0);
+        estimateMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
+        estimateMask->SetInsideValue( 1 );
+        estimateMask->Update();
+
+        // Create volume contour from the input mask
+        maskContour->SetInput(estimateMask->GetOutput());
+        maskContour->SetForegroundValue( 1 );
+        maskContour->Update();
+
+        skeleton->SetInput(maskContour->GetOutput());
+        skeleton->Update();
+
+        // Run through the image gradient (using the countour) in order to find its boundaries
+        inputGrad->SetInput(updatedImage);
+        inputGrad->Update();
+
+        radius[0] = neighborRadius[0];
+        radius[1] = neighborRadius[1];
+        radius[2] = neighborRadius[2];
+        itk::ImageRegionIterator<LabelImageType> contourIt(skeleton->GetOutput(),skeleton->GetOutput()->GetRequestedRegion());
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > imageIt(radius, updatedImage,updatedImage->GetRequestedRegion());
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > gradIt(radius, inputGrad->GetOutput(),inputGrad->GetOutput()->GetRequestedRegion());
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > updateIt(radius, auxImage,auxImage->GetRequestedRegion());
+
+        // Running over the both image and mask contour in order to find the closest voxel in the brain tissue.
+        contourIt.GoToBegin();
+        imageIt.GoToBegin();
+        gradIt.GoToBegin();
+        updateIt.GoToBegin();
+
+        unsigned int N = (neighborRadius[0]*2 + 1)*(neighborRadius[1]*2 + 1)*(neighborRadius[2]*2 + 1);
+        InputPixelType wGrad, wIntensity;
+        while (!imageIt.IsAtEnd()) {
+            if (contourIt.Get()!=static_cast<LabelPixelType>(0)) {
+                //Calculating statistics into the neighborhood
+                wGrad=0.0;
+                wIntensity=0.0;
+                for (unsigned int p = 0; p < N; p++) {
+                    //Weighted average to local gradient
+                    wGrad += gradIt.GetPixel(p);
+                    //Weighted average to local intensity
+                    wIntensity += imageIt.GetPixel(p);
+                }
+                wGrad/=N;
+                wIntensity/=N;
+
+                //Cutting out voxels that does not belongs to the brain based on the mean of the local gradient and mean gray level intensity
+                for (unsigned int p = 0; p < N; p++) {
+                    if (imageIt.GetPixel(p)!=0) {
+                        if (gradIt.GetPixel(p) < (wGrad) && imageIt.GetPixel(p) < (wIntensity)){
+                            updateIt.SetPixel(p, 0);
+                        }
                     }
                 }
+
             }
 
+            ++contourIt;
+            ++imageIt;
+            ++updateIt;
+            ++gradIt;
         }
 
-        ++contourIt;
-        ++imageIt;
-        ++updateIt;
-        ++gradIt;
-    }
+        //Binaring the updated image
+        newMask->SetInput(auxImage);
+        newMask->SetLowerThreshold(1.0);
+        newMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
+        newMask->SetInsideValue(1.0);
 
-    //Binaring the updated image
-    std::cout<<"Binaring the updated image..."<<std::endl;
-    typename BinaryThresholdType::Pointer newMask = BinaryThresholdType::New();
-    newMask->SetInput(updatedImage);
-    newMask->SetLowerThreshold(1.0);
-    newMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
-    newMask->SetInsideValue(1.0);
+        //Median filter in the input image
+        median->SetInput(newMask->GetOutput());
+        MedianFilterType::RadiusType mRadius;
+        mRadius[0] = medianRadius[0];
+        mRadius[1] = medianRadius[1];
+        mRadius[2] = medianRadius[2];
+        median->SetRadius(mRadius);
 
-    //Median filter in the input image
-    typedef itk::MedianImageFilter<LabelImageType, LabelImageType>  MedianFilterType;
-    typename MedianFilterType::Pointer median = MedianFilterType::New();
-    median->SetInput(newMask->GetOutput());
-    MedianFilterType::RadiusType mRadius;
-    mRadius[0] = medianRadius[0];
-    mRadius[1] = medianRadius[1];
-    mRadius[2] = medianRadius[2];
-    median->SetRadius(mRadius);
-
-    //Filling in the holes in the updated brain mask
-    std::cout<<"Filling in the holes in the updated brain mask..."<<std::endl;
-    typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType > VotingFillInType;
-    typename VotingFillInType::InputSizeType vRadius;
-
-    //Finding the bigger size of the median filter
-    int r = 0;
-    for (unsigned int i = 0; i < Dimension; ++i) {
-        if (medianRadius[i]>r) {
-            r=medianRadius[i];
+        //Filling in the holes in the updated brain mask
+        //Finding the bigger size of the median filter
+        int r = 0;
+        for (unsigned int i = 0; i < Dimension; ++i) {
+            if (medianRadius[i]>r) {
+                r=medianRadius[i];
+            }
         }
-    }
-    vRadius.Fill( r );
-    typename VotingFillInType::Pointer fillInHoles = VotingFillInType::New();
-    fillInHoles->SetInput( median->GetOutput() );
-    fillInHoles->SetRadius( vRadius );
-    fillInHoles->SetMajorityThreshold( majorityThreshold );
-    fillInHoles->SetBackgroundValue( 0 );
-    fillInHoles->SetForegroundValue( 1 );
-    fillInHoles->SetMaximumNumberOfIterations( numberOfIterations );
+        vRadius.Fill( r );
+        fillInHoles->SetInput( median->GetOutput() );
+        fillInHoles->SetRadius( vRadius );
+        fillInHoles->SetMajorityThreshold( majorityThreshold );
+        fillInHoles->SetBackgroundValue( 0 );
+        fillInHoles->SetForegroundValue( 1 );
+        fillInHoles->SetMaximumNumberOfIterations( 10 ); // a default number of iterations to a general case
 
-    //Masking the input image with the corrected brain mask
-    std::cout<<"Masking the input image with the corrected brain mask..."<<std::endl;
-    typedef itk::MaskImageFilter<InputImageType, LabelImageType>    MaskFilterType;
-    typename MaskFilterType::Pointer maskInput = MaskFilterType::New();
-    maskInput->SetInput(inputReader->GetOutput());
-    maskInput->SetMaskImage(fillInHoles->GetOutput());
-    maskInput->Update();
+        //Masking the input image with the corrected brain mask
+        maskInput->SetInput(updatedImage);
+        maskInput->SetMaskImage(fillInHoles->GetOutput());
+        maskInput->Update();
+
+
+
+        itk::ImageRegionIterator<InputImageType>    inIt(maskInput->GetOutput(), maskInput->GetOutput()->GetRequestedRegion());
+        itk::ImageRegionIterator<InputImageType>    upIt(updatedImage, updatedImage->GetRequestedRegion());
+        itk::ImageRegionIterator<InputImageType>    auxIt(auxImage, auxImage->GetRequestedRegion());
+        upIt.GoToBegin();
+        auxIt.GoToBegin();
+        inIt.GoToBegin();
+        while (!upIt.IsAtEnd()) {
+            upIt.Set(inIt.Get());
+            auxIt.Set(inIt.Get());
+            ++upIt;
+            ++auxIt;
+            ++inIt;
+        }
+
+        if (updatedMask!="" && n == numberOfIterations-1) {
+            std::cout<<"Output updated mask with less non-brain tissues at location: "<<updatedMask.c_str()<<std::endl;
+            typedef itk::ImageFileWriter<LabelImageType> WriterType;
+            typename WriterType::Pointer labelWriter = WriterType::New();
+            labelWriter->SetFileName( updatedMask.c_str() );
+            labelWriter->SetInput( fillInHoles->GetOutput() );
+            labelWriter->SetUseCompression(1);
+            labelWriter->Update();
+        }
+
+    }
+    std::cout<<"finished!"<<std::endl;
+    std::cout<<"*********************"<<std::endl;
 
     // Output updated image with less non-brain tissues
     std::cout<<"Output updated image with less non-brain tissues at location: "<<updatedVolume.c_str()<<std::endl;
     typedef itk::ImageFileWriter<InputImageType> WriterType;
     typename WriterType::Pointer imageWriter = WriterType::New();
     imageWriter->SetFileName( updatedVolume.c_str() );
-    imageWriter->SetInput( maskInput->GetOutput() );
+    imageWriter->SetInput( updatedImage );
     imageWriter->SetUseCompression(1);
     imageWriter->Update();
 
-    if (updatedMask!="") {
-        std::cout<<"Output updated mask with less non-brain tissues at location: "<<updatedMask.c_str()<<std::endl;
-        typedef itk::ImageFileWriter<LabelImageType> WriterType;
-        typename WriterType::Pointer labelWriter = WriterType::New();
-        labelWriter->SetFileName( updatedMask.c_str() );
-        labelWriter->SetInput( fillInHoles->GetOutput() );
-        labelWriter->SetUseCompression(1);
-        labelWriter->Update();
-    }
+
 
     return EXIT_SUCCESS;
 }

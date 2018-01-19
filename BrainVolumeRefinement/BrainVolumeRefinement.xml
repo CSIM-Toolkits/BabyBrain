@@ -65,8 +65,8 @@
       <longflag>--iterations</longflag>
       <flag>i</flag>
       <label>Number Of Iterations</label>
-      <description><![CDATA[Maximum number of iterations. This filter is executed iteratively as long as at least one pixel has changed in a previous iteration, or until the maximum number of iterations has been reached.]]></description>
-      <default>1</default>
+      <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. If your image presents lighter errors, it should be decreased. On the contrary, if your image presents a lot of non-brain areas (e.g. dura matter), it should be increased.]]></description>
+      <default>10</default>
     </integer>
   </parameters>
 </executable>

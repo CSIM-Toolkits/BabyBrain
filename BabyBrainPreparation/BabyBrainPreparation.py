@@ -568,7 +568,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setShrinkFactorSecondLevelWidget = qt.QSpinBox()
     self.setShrinkFactorSecondLevelWidget.setMinimum(1)
     self.setShrinkFactorSecondLevelWidget.setMaximum(10)
-    self.setShrinkFactorSecondLevelWidget.setValue(1)
+    self.setShrinkFactorSecondLevelWidget.setValue(2)
     self.setShrinkFactorSecondLevelWidget.setToolTip(
       "The same as in Shrink Factor (First Level).")
     parametersBiasCorrectionLayout.addRow("Shrink Factor (Second Level) ", self.setShrinkFactorSecondLevelWidget)

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Utilities.CSIM Supporting Modules.Baby Brain</category>
+  <title>Local Labeling Correction</title>
+  <description><![CDATA[This is a CLI module that corrects localized segmentation errors by using a searching windows and label statistics. This is useful for small disturbances through the image label.]]></description>
+  <version>0.0.1</version>
+  <documentation-url>https://www.slicer.org/wiki/Documentation/Nightly/Modules/LocalLabelingCorrection</documentation-url>
+  <license>Slicer</license>
+  <contributor>Antonio Carlos Senra Filho (University of Sao Paulo)</contributor>
+  <acknowledgements>This work was partially funded by CNPq grant 405574/2017-7</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image type="label">
+      <name>inputLabel</name>
+      <label>Input Label</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input label]]></description>
+    </image>
+    <image type="label">
+      <name>outputLabel</name>
+      <label>Output Label</label>
+      <channel>output</channel>
+      <index>1</index>
+      <description><![CDATA[Output label]]></description>
+    </image>
+  </parameters>
+  <parameters>
+    <label>Label Correction Parameters</label>
+    <description><![CDATA[Label correction parameters]]></description>
+    <integer>
+      <name>labelToCorrect</name>
+      <longflag>--labelToCorrect</longflag>
+      <flag>l</flag>
+      <label>Label Value To Correct</label>
+      <description><![CDATA[The label value which will be set to find segmentation errors.]]></description>
+      <default>1</default>
+    </integer>
+    <integer>
+      <name>labelError</name>
+      <longflag>--labelErrorValue</longflag>
+      <flag>e</flag>
+      <label>Label Error Value</label>
+      <description><![CDATA[The label value that will be considered as an segmentation error.]]></description>
+      <default>0</default>
+    </integer>
+    <float>
+      <name>tolerance</name>
+      <longflag>--tolerance</longflag>
+      <flag>t</flag>
+      <label>Tolerance</label>
+      <description><![CDATA[A percentual value that defines how much errors should be considered in order to change the local label value.]]></description>
+      <default>0.1</default>
+      <constraints>
+        <minimum>0.01</minimum>
+        <maximum>0.99</maximum>
+        <step>0.01</step>
+      </constraints>
+    </float>
+    <integer-vector>
+      <name>neighborRadius</name>
+      <longflag>--neighborRadius</longflag>
+      <flag>r</flag>
+      <label>Neighborhood Radius</label>
+      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood. This should large enough in order to get the bounderie tissues present in the input image. This values defines de searching window used to compare the correct and wrong labels.]]></description>
+      <default>2,2,2</default>
+    </integer-vector>
+  </parameters>
+</executable>

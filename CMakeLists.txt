@@ -27,6 +27,7 @@ add_subdirectory(GlobalContrastEnhancer)
 add_subdirectory(BayesianTissueClassifier)
 add_subdirectory(SplitLabelValues)
 add_subdirectory(BrainVolumeRefinement)
+add_subdirectory(LocalLabelingCorrection)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------

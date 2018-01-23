@@ -22,7 +22,6 @@ file(GLOB BabyBrain_FET2012_Atlases_Brainmask RELATIVE "${CMAKE_CURRENT_SOURCE_D
 file(GLOB BabyBrain_FET2012_Atlases_Brainstem RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/brainstem/*.nii.gz")
 file(GLOB BabyBrain_FET2012_Atlases_Cerebellum RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/cerebellum/*.nii.gz")
 file(GLOB BabyBrain_FET2012_Atlases_CSF RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/csf/*.nii.gz")
-file(GLOB BabyBrain_FET2012_Atlases_DeepGrayMatter RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/dgm/*.nii.gz")
 file(GLOB BabyBrain_FET2012_Atlases_Ventricules RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/ventricules/*.nii.gz")
 file(GLOB BabyBrain_FET2012_Templates RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/FET2012/templates/*.nii.gz")
 
@@ -43,7 +42,6 @@ set(MODULE_PYTHON_RESOURCES
   ${BabyBrain_FET2012_Atlases_Brainstem}
   ${BabyBrain_FET2012_Atlases_Cerebellum}
   ${BabyBrain_FET2012_Atlases_CSF}
-  ${BabyBrain_FET2012_Atlases_DeepGrayMatter}
   ${BabyBrain_FET2012_Atlases_Ventricules}
   ${BabyBrain_FET2012_Templates}
 

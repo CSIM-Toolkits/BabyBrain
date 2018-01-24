@@ -381,7 +381,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Neighborhood Radius
     #
     self.setNeighborhoodRadiusWidget = qt.QLineEdit()
-    self.setNeighborhoodRadiusWidget.setText('10,10,10')
+    self.setNeighborhoodRadiusWidget.setText('3,3,3')
     self.setNeighborhoodRadiusWidget.setToolTip("A list of 3 values indicating the (x,y,z) size of the neighborhood. "
                                                 "This should large enough in order to get the bounderie tissues present in the "
                                                 "input image. The neighborhood is running over the contour of the input mask."
@@ -392,7 +392,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     # Second Layer (Median Filtering) Radius
     #
     self.setSecondLayerMedianRadiusWidget = qt.QLineEdit()
-    self.setSecondLayerMedianRadiusWidget.setText('5,5,5')
+    self.setSecondLayerMedianRadiusWidget.setText('1,1,1')
     self.setSecondLayerMedianRadiusWidget.setToolTip(
       "A list of 3 values indicating the (x,y,z) size of the neighborhood used in "
       "the second layer of the brain volume estimate. This parameter is responsible"

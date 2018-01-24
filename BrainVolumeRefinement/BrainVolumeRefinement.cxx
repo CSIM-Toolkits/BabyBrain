@@ -1,5 +1,6 @@
 #include "itkImageFileWriter.h"
 
+#include "itkSubtractImageFilter.h"
 #include "itkConnectedComponentImageFilter.h"
 #include "itkRelabelComponentImageFilter.h"
 #include "itkBinaryThresholdImageFilter.h"
@@ -90,9 +91,17 @@ int DoIt( int argc, char * argv[], TPixel )
         ++inIt;
     }
 
+    //If user's want it, the new brain mask is returned.
+    typename LabelImageType::Pointer newBrainMask = LabelImageType::New();
+    newBrainMask->CopyInformation(inputReader->GetOutput());
+    newBrainMask->SetRegions(inputReader->GetOutput()->GetRequestedRegion());
+    newBrainMask->Allocate();
+    newBrainMask->FillBuffer(0);
+
     std::cout<<"*********************"<<std::endl;
     std::cout<<"BrainVolumeRefinement: Initiated"<<std::endl;
     std::cout<<"Iteration: ";
+    bool stoppedByConvergence = false;
     for (int n = 0; n < numberOfIterations; ++n) {
         typename BinaryThresholdType::Pointer estimateMask = BinaryThresholdType::New();
         typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
@@ -109,6 +118,18 @@ int DoIt( int argc, char * argv[], TPixel )
         typename LabelImageType::SizeType radius;
         typename VotingFillInType::InputSizeType vRadius;
 
+
+        //Calculating the brain volume of iteration i
+        double totalVolumeI;
+        itk::ImageRegionIterator<InputImageType>    itI(updatedImage, updatedImage->GetRequestedRegion());
+        itI.GoToBegin();
+        while (!itI.IsAtEnd()) {
+            if (itI.Get()!=static_cast<InputPixelType>(0)) {
+                totalVolumeI++;
+            }
+            ++itI;
+        }
+
         //Making mask of the input volume
         std::cout<<(n+1)<<"..."<<std::flush;
         estimateMask->SetInput(updatedImage);
@@ -122,8 +143,6 @@ int DoIt( int argc, char * argv[], TPixel )
         maskContour->SetForegroundValue( 1 );
         maskContour->Update();
 
-//        TODO Fazer a subtracao do contorno anterior...assim ele nao passa nas regioes onde ficou estavel
-//        TODO Tirar alguns passos do countour iterator (passar para neighborhood iterator) pode ajudar na reducao do tempo...pode colocar uma variavel a mais so para fazer isso
         skeleton->SetInput(maskContour->GetOutput());
         skeleton->Update();
 
@@ -184,13 +203,15 @@ int DoIt( int argc, char * argv[], TPixel )
         newMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
         newMask->SetInsideValue(1.0);
 
-        //Median filter in the input image
-        median->SetInput(newMask->GetOutput());
-        MedianFilterType::RadiusType mRadius;
-        mRadius[0] = medianRadius[0];
-        mRadius[1] = medianRadius[1];
-        mRadius[2] = medianRadius[2];
-        median->SetRadius(mRadius);
+        if (useMedianFilter) {
+            //Median filter in the input image
+            median->SetInput(newMask->GetOutput());
+            MedianFilterType::RadiusType mRadius;
+            mRadius[0] = medianRadius[0];
+            mRadius[1] = medianRadius[1];
+            mRadius[2] = medianRadius[2];
+            median->SetRadius(mRadius);
+        }
 
         //Filling in the holes in the updated brain mask
         //Finding the bigger size of the median filter
@@ -201,7 +222,7 @@ int DoIt( int argc, char * argv[], TPixel )
             }
         }
         vRadius.Fill( r );
-        fillInHoles->SetInput( median->GetOutput() );
+        (useMedianFilter)?fillInHoles->SetInput( median->GetOutput() ):fillInHoles->SetInput( newMask->GetOutput() );
         fillInHoles->SetRadius( vRadius );
         fillInHoles->SetMajorityThreshold( majorityThreshold );
         fillInHoles->SetBackgroundValue( 0 );
@@ -229,30 +250,59 @@ int DoIt( int argc, char * argv[], TPixel )
         itk::ImageRegionIterator<InputImageType>    inIt(maskInput->GetOutput(), maskInput->GetOutput()->GetRequestedRegion());
         itk::ImageRegionIterator<InputImageType>    upIt(updatedImage, updatedImage->GetRequestedRegion());
         itk::ImageRegionIterator<InputImageType>    auxIt(auxImage, auxImage->GetRequestedRegion());
+        itk::ImageRegionIterator<LabelImageType>    maskIt(connectedMask->GetOutput(), connectedMask->GetOutput()->GetRequestedRegion());
+        itk::ImageRegionIterator<LabelImageType>    newMaskIt(newBrainMask, newBrainMask->GetRequestedRegion());
         upIt.GoToBegin();
         auxIt.GoToBegin();
         inIt.GoToBegin();
+        maskIt.GoToBegin();
+        newMaskIt.GoToBegin();
         while (!upIt.IsAtEnd()) {
+            //Copy updated and auxliary images
             upIt.Set(inIt.Get());
             auxIt.Set(inIt.Get());
+
+            //Copy brain mask
+            newMaskIt.Set(maskIt.Get());
+
             ++upIt;
             ++auxIt;
             ++inIt;
+            ++maskIt;
+            ++newMaskIt;
         }
 
-        if (updatedMask!="" && n == numberOfIterations-1) {
-
-            typedef itk::ImageFileWriter<LabelImageType> WriterType;
-            typename WriterType::Pointer labelWriter = WriterType::New();
-            labelWriter->SetFileName( updatedMask.c_str() );
-            labelWriter->SetInput( connectedMask->GetOutput() );
-            labelWriter->SetUseCompression(1);
-            labelWriter->Update();
+        //Calculating the brain volume of iteration i+1
+        double totalVolumeII;
+        itk::ImageRegionIterator<InputImageType>    itII(updatedImage, updatedImage->GetRequestedRegion());
+        itII.GoToBegin();
+        while (!itII.IsAtEnd()) {
+            if (itII.Get()!=static_cast<InputPixelType>(0)) {
+                totalVolumeII++;
+            }
+            ++itII;
         }
 
+        //Stopping criteria
+        if ( ((totalVolumeI-totalVolumeII)/totalVolumeI) <= convergence) {
+            stoppedByConvergence = true;
+            break;
+        }
     }
+    if (updatedMask!="") {
+        typedef itk::ImageFileWriter<LabelImageType> WriterType;
+        typename WriterType::Pointer labelWriter = WriterType::New();
+        labelWriter->SetFileName( updatedMask.c_str() );
+        labelWriter->SetInput( newBrainMask );
+        labelWriter->SetUseCompression(1);
+        labelWriter->Update();
+    }
+
     std::cout<<"finished!"<<std::endl;
     std::cout<<"*********************"<<std::endl;
+
+    //Informs what stopping criteria was reached first.
+    (stoppedByConvergence)?std::cout<<"Stopped by: Convergence"<<std::endl:std::cout<<"Stopped by: Number of iterations"<<std::endl;
 
     // Output updated image with less non-brain tissues
     std::cout<<"Output updated image with less non-brain tissues at location: "<<updatedVolume.c_str()<<std::endl;
@@ -265,8 +315,6 @@ int DoIt( int argc, char * argv[], TPixel )
     imageWriter->SetInput( updatedImage );
     imageWriter->SetUseCompression(1);
     imageWriter->Update();
-
-
 
     return EXIT_SUCCESS;
 }

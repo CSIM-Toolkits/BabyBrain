@@ -42,31 +42,50 @@
       <flag>r</flag>
       <label>Neighborhood Radius</label>
       <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood. This should large enough in order to get the bounderie tissues present in the input image. The neighborhood is running over the contour of the input mask. Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).]]></description>
-      <default>10,10,10</default>
+      <default>3,3,3</default>
     </integer-vector>
-    <integer-vector>
-      <name>medianRadius</name>
-      <longflag>--medianRadius</longflag>
-      <flag>m</flag>
-      <label>Median Radius</label>
-      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of median filter.]]></description>
-      <default>5,5,5</default>
-    </integer-vector>
-    <integer>
-      <name>majorityThreshold</name>
-      <longflag>--majorityThreshold</longflag>
-      <flag>t</flag>
-      <label>Majority Threshold</label>
-      <description><![CDATA[Majority threshold. It is the number of pixels over 50% that will decide whether an OFF pixel will become ON or not. For example, if the neighborhood of a pixel has 124 pixels (excluding itself), the 50% will be 62, and if you set upd a Majority threshold of 5, that means that the filter will require 67 or more neighbor pixels to be ON in order to switch the current OFF pixel to ON. The default value is 1.]]></description>
-      <default>1</default>
-    </integer>
+    <float>
+      <name>convergence</name>
+      <longflag>--convergence</longflag>
+      <flag>c</flag>
+      <label>Convergence</label>
+      <description><![CDATA[A percentual value that indicates how permissive is the algorithm to keep changing the brain borders. This counts how many voxels were changed in previous iterations and then estimate if the total amount of changes reaches a limit (regarind the total number of voxels changed in the brain volume). High values will result conservative outputs (less changes in the brain volume), on the other hand, low values will force a strong volume difference.]]></description>
+      <default>0.01</default>
+      <constraints>
+        <minimum>0.0001</minimum>
+        <maximum>0.5</maximum>
+        <step>0.0001</step>
+      </constraints>
+    </float>
     <integer>
       <name>numberOfIterations</name>
       <longflag>--iterations</longflag>
       <flag>i</flag>
       <label>Number Of Iterations</label>
-      <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. If your image presents lighter errors, it should be decreased. On the contrary, if your image presents a lot of non-brain areas (e.g. dura matter), it should be increased.]]></description>
-      <default>10</default>
+      <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. This is a up limit threshold in order to avoid infinity loop in the brain volume correction. If the tolerance level does not reaches a stable results, then the number of iteration limit will stop de algorithm.]]></description>
+      <default>20</default>
+    </integer>
+    <boolean>
+      <name>useMedianFilter</name>
+      <longflag>--useMedianFilter</longflag>
+      <description><![CDATA[Choose if you want to use a median filtering process in order to smooth the final brain mask. If checked, the Median Radius will be used.]]></description>
+      <label>Use Median Filter</label>
+      <default>true</default>
+    </boolean>
+    <integer-vector>
+      <name>medianRadius</name>
+      <longflag>--medianRadius</longflag>
+      <label>Median Radius</label>
+      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of median filter.]]></description>
+      <default>1,1,1</default>
+    </integer-vector>
+    <integer>
+      <name>majorityThreshold</name>
+      <longflag>--majorityThreshold</longflag>
+      <flag>m</flag>
+      <label>Majority Threshold</label>
+      <description><![CDATA[Majority threshold. It is the number of pixels over 50% that will decide whether an OFF pixel will become ON or not. For example, if the neighborhood of a pixel has 124 pixels (excluding itself), the 50% will be 62, and if you set upd a Majority threshold of 5, that means that the filter will require 67 or more neighbor pixels to be ON in order to switch the current OFF pixel to ON. The default value is 1.]]></description>
+      <default>1</default>
     </integer>
   </parameters>
 </executable>

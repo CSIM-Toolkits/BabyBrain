@@ -214,7 +214,7 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
     self.setBrainAtlasComboBoxWidget.setToolTip(
       "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
       "binary labels are considered. These brain atlases will mainly help to segment the cerebellum, brainstem and deep"
-      "gray matter. Available atlases: NEO2012 (Neonatal), FET2012 (Fetal) and PED2008 (Pediatric).")
+      "gray matter. Available atlases: NEO2012 (Neonatal) and FET2012 (Fetal).")
     parametersAtlasPropagationLayout.addRow("Brain Atlas ", self.setBrainAtlasComboBoxWidget)
 
     #
@@ -624,9 +624,9 @@ class BabyBrainPreparationWidget(ScriptedLoadableModuleWidget):
       "This informs the maximum scaling factor to the contrast enhancement method. The higher it is, the stronger will be contrast modulation.")
 
     self.setMinimumOutputWeightingWidget = qt.QSpinBox()
-    self.setMinimumOutputWeightingWidget.setMinimum(1)
+    self.setMinimumOutputWeightingWidget.setMinimum(0)
     # self.setMinimumOutputWeightingWidget.setMaximum(30)
-    self.setMinimumOutputWeightingWidget.setValue(1)
+    self.setMinimumOutputWeightingWidget.setValue(0)
     self.setMinimumOutputWeightingWidget.setToolTip(
       "This informs the minimum scaling factor to the contrast enhancement method. The lower it is, the stronger will be contrast modulation.")
 
@@ -992,7 +992,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
                                                                  "\\" + brainAtlas +
-                                                                 "\\cerebellum\\cerebellum_" + str(setAge) + ".nii.gz",
+                                                                 "\\cerebellum\\cerebellum_" + str(int(setAge)) + ".nii.gz",
                                                                  readingParameters,
                                                                  True)
     else:
@@ -1003,7 +1003,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, cerebellumMaskNode) = slicer.util.loadVolume(databasePath +
                                                                  "/" + brainAtlas +
-                                                                 "/cerebellum/cerebellum_" + str(setAge) + ".nii.gz",
+                                                                 "/cerebellum/cerebellum_" + str(int(setAge)) + ".nii.gz",
                                                                  readingParameters,
                                                                  True)
 
@@ -1027,7 +1027,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
                                                                 "\\" + brainAtlas +
-                                                                "\\brainstem\\brainstem_" + str(setAge) + ".nii.gz",
+                                                                "\\brainstem\\brainstem_" + str(int(setAge)) + ".nii.gz",
                                                                 readingParameters,
                                                                 True)
     else:
@@ -1038,7 +1038,7 @@ class BabyBrainPreparationLogic(ScriptedLoadableModuleLogic):
       readingParameters['labelmap'] = True
       (readSuccess, brainstemMaskNode) = slicer.util.loadVolume(databasePath +
                                                                 "/" + brainAtlas +
-                                                                "/brainstem/brainstem_" + str(setAge) + ".nii.gz",
+                                                                "/brainstem/brainstem_" + str(int(setAge)) + ".nii.gz",
                                                                 readingParameters,
                                                                 True)
 

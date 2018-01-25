@@ -175,6 +175,19 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     parametersMedianFilterLayout = qt.QFormLayout(parametersMedianFilterCollapsibleButton)
 
     #
+    # Apply Median Filtering?
+    #
+    self.setApplyMedianFilteringBooleanWidget = ctk.ctkCheckBox()
+    self.setApplyMedianFilteringBooleanWidget.setChecked(True)
+    self.setApplyMedianFilteringBooleanWidget.setToolTip(
+      "Check this if you want to perform a median filtering in the final step of brain tissues segmentation."
+      "This operation can be useful to decrease the amount of punctual errors among tissues, however the"
+      "filtering parameters (i.e. both number of iterations and neighborhood size) may strongly affects the final tissue"
+      "segmentation.")
+    parametersMedianFilterLayout.addRow("Apply Median Filter",
+                                            self.setApplyMedianFilteringBooleanWidget)
+
+    #
     # Neighborhood Size
     #
     self.setNeighborhoodSizeLineEditWidget = qt.QLineEdit()
@@ -417,6 +430,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     interpolationRegistration = self.setInterpolationFunctionRegistrationComboBoxWidget.currentText
     voxelResampling = self.setVoxelResolutionLineEditWidget.text
     interpolationResampling = self.setInterpolationFunctionResamplingComboBoxWidget.currentText
+    applyMedianFiltering = self.setApplyMedianFilteringBooleanWidget.isChecked()
     neighborSize = self.setNeighborhoodSizeLineEditWidget.text
     interations = self.setMedianIterationsWidget.value
     logic.run(self.inputSelector.currentNode()
@@ -437,6 +451,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
               , interpolationRegistration
               , voxelResampling
               , interpolationResampling
+              , applyMedianFiltering
               , neighborSize
               , interations)
 
@@ -500,6 +515,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
           , interpolationRegistration
           , voxelResampling
           , interpolationResampling
+          , applyMedianFiltering
           , neighborSize
           , interations):
     """
@@ -536,14 +552,14 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     if ColorTableNode is None:
       if splitHemispheres:
         if platform.system() is "Windows":
-            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "\\Resources\\2018_USP_BabyBrain_Lateralized.ctbl")
+            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "\\Resources\\2018_USP_BabyBrain_Lateralized.ctbl", True)
         else:
-            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "/Resources/2018_USP_BabyBrain_Lateralized.ctbl")
+            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "/Resources/2018_USP_BabyBrain_Lateralized.ctbl", True)
       else:
         if platform.system() is "Windows":
-            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "\\Resources\\2018_USP_BabyBrain.ctbl")
+            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "\\Resources\\2018_USP_BabyBrain.ctbl", True)
         else:
-            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "/Resources/2018_USP_BabyBrain.ctbl")
+            (readSuccess, ColorTableNode) = slicer.util.loadColorTable(modulePath + "/Resources/2018_USP_BabyBrain.ctbl", True)
 
     # Allocating the default path in order to save temporary files into the hard drive
     home = ""
@@ -1068,29 +1084,6 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
                            , definitions=definitions)
     slicer.util.showStatusMessage("Whole brain (first) segmentation is finished...")
 
-    # ######################################################################################
-    # # Step  - Smoothing brain segmentation by median filtering
-    # ######################################################################################
-    # for i in range(0, interations):
-    #   params = {}
-    #   params['neighborhood'] = neighborSize
-    #   params['inputVolume'] = brainOnlyLabelMask
-    #   params['outputVolume'] = brainOnlyLabelMask
-    #
-    #   slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
-    #   slicer.util.showStatusMessage("Brain segmentation smoothing is finished...")
-
-    # #Creating brain only volume
-    # brainOnlyMask = slicer.vtkMRMLLabelMapVolumeNode()
-    # brainOnlyMask.SetName("brainOnly_volume")
-    # slicer.mrmlScene.AddNode(brainOnlyMask)
-    #
-    # inputLabel = sitkUtils.PullVolumeFromSlicer(brainOnlyLabelMask)
-    # threshold = sitk.BinaryThresholdImageFilter()
-    # brainMask = threshold.Execute(inputLabel, 1, 3, 1, 0)
-    #
-    # sitkUtils.PushVolumeToSlicer(brainMask, brainOnlyMask)
-
     ######################################################################################
     # Step  - Correcting the brain ventricules segmentation
     ######################################################################################
@@ -1102,7 +1095,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
         readingParameters['center'] = True
         readingParameters['show'] = False
         readingParameters['labelmap'] = True
-        (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
+        (readSuccess, ventriculesMaskNode) = slicer.util.loadVolume(databasePath +
                                                                     "\\" + brainAtlas +
                                                                     "\\ventricules\\ventricules_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                     True)
@@ -1112,7 +1105,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
         readingParameters['center'] = True
         readingParameters['show'] = False
         readingParameters['labelmap'] = True
-        (readSuccess, venctriculesMaskNode) = slicer.util.loadVolume(databasePath +
+        (readSuccess, ventriculesMaskNode) = slicer.util.loadVolume(databasePath +
                                                                     "/" + brainAtlas +
                                                                     "/ventricules/ventricules_" + str(int(setAge)) + ".nii.gz", readingParameters,
                                                                     True)
@@ -1122,7 +1115,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     tmpVentriculesLabelMask.SetName("tmpVentricules_mask")
     slicer.mrmlScene.AddNode(tmpVentriculesLabelMask)
     self.applyRegistrationTransforms(registrationAlgorithm
-                                     , venctriculesMaskNode
+                                     , ventriculesMaskNode
                                      , tmpResampledInputNode
                                      , tmpVentriculesLabelMask
                                      , regAffine
@@ -1243,12 +1236,22 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     tmpGMAndWMVolume.SetName("gm_and_wm_volume")
     slicer.mrmlScene.AddNode(tmpGMAndWMVolume)
     params = {}
-    params['inputVolume1'] = tmpResampledInputNode.GetID() # TODO Rever se usa a imagem toda ou so o brainOnly...a segmentacao quando junto com o cerebelo fica cortada... se usar a image inteira, precisa filtrar labelCorrect de novo...
+    params['inputVolume1'] = tmpResampledInputNode.GetID()
     params['inputVolume2'] = tmpCSFVolume.GetID()
     params['outputVolume'] = tmpGMAndWMVolume.GetID()
     params['order'] = 0
 
     slicer.cli.run(slicer.modules.subtractscalarvolumes, None, params, wait_for_completion=True)
+
+    #Enhancing signal of GM and WM volume
+    self.imageGlobalConstrastEnhancement(tmpGMAndWMVolume
+                                         , tmpGMAndWMVolume
+                                         , "Logistic"
+                                         , 0.04
+                                         , 0.96
+                                         , 2
+                                         , 0
+                                         , False)
 
     #Segmenting only GM and WM tissues
     definitions = [1, 2]
@@ -1257,8 +1260,11 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
 
     self.segmentingTissues(tmpGMAndWMVolume, modality, 3, tmpGMPlusWMNode, definitions=definitions)
 
+    # Correcting WM outside GM pial surface
+    self.labelCorrecting(tmpGMPlusWMNode, tmpGMPlusWMNode, 2, 0)
+
     # Summing all tissues together
-    self.combineLabels(brainOnlyLabelMask, tmpGMPlusWMNode, brainOnlyLabelMask, firstOverwrites=False)
+    self.combineLabels(tmpCSFNode, tmpGMPlusWMNode, brainOnlyLabelMask, firstOverwrites=False)
 
     # End segmentation process with only a global tissue segmentation.
     if not splitHemispheres:
@@ -1266,6 +1272,18 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       # Step  - Merging brainstem, cerebellum and brain hemispheres all the tissues together
       ######################################################################################
       self.combineLabels(brainOnlyLabelMask, brainstemPlusCerebellumLabelMask, outputVolume, firstOverwrites=False)
+
+      # Cleaning up wrong voxels that may appear outsied CSF tissue
+      if modality == "T1":
+        self.labelCorrecting(outputVolume, outputVolume, 3, 0)  # GM
+        self.labelCorrecting(outputVolume, outputVolume, 2, 0)  # WM
+      else:
+        self.labelCorrecting(outputVolume, outputVolume, 1, 0) # GM
+        self.labelCorrecting(outputVolume, outputVolume, 2, 0)  # WM
+
+      # Removing small sets of non-connected clusters that does not belongs to major tissues classifications
+      # Since we are looking for major areas of the brain, a minimum size of 5 ml is used.
+
 
       if estimateBasalGanglia:
           ######################################################################################
@@ -1330,7 +1348,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
       slicer.mrmlScene.RemoveNode(ventriculesCorrectionLabelMask)
       slicer.mrmlScene.RemoveNode(tmpVentriculesRegion)
-      slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
+      slicer.mrmlScene.RemoveNode(ventriculesMaskNode)
       slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
       slicer.mrmlScene.RemoveNode(tmpGMPlusWMNode)
       slicer.mrmlScene.RemoveNode(tmpGMAndWMVolume)
@@ -1340,12 +1358,32 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       if estimateBasalGanglia:
           slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)
 
+      if applyMedianFiltering:
+          ######################################################################################
+          # Step  - Smoothing brain segmentation by median filtering
+          ######################################################################################
+          for i in range(0, interations):
+            params = {}
+            params['neighborhood'] = neighborSize
+            params['inputVolume'] = outputVolume
+            params['outputVolume'] = outputVolume
+
+            slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
+            slicer.util.showStatusMessage("OPTIONAL: Brain segmentation smoothing is finished...")
+
       # Setting Color Table with the USP_2018_GlobalBrain pattern
       displayBrainLabel = outputVolume.GetDisplayNode()
       displayBrainLabel.SetAndObserveColorNodeID(ColorTableNode.GetID())
 
       logging.info('Processing completed')
       slicer.util.showStatusMessage("Baby Brain Segmentation is finished")
+
+      # Removing the temporary folder with the segmentations files
+      if platform.system() is "Windows":
+          os.system("rmdir /S /Q " + tmpFolder)
+      else:
+          os.system("rm -R " + tmpFolder)
+
       return True
 
 
@@ -1437,6 +1475,19 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     ######################################################################################
     self.combineLabels(brainOnlyHemispheresLabelMask, brainstemPlusCerebellumLabelMask, outputVolume)
 
+# TODO ERRO quando aplica o color table: depende da modalidade! T1 e T2 nao ficam com o mesmo padrao de cores...acertar o Colortable ou a segmentacao?
+    # Cleaning up wrong voxels that may appear outsied CSF tissue
+    if modality == "T1":
+        self.labelCorrecting(outputVolume, outputVolume, 23, 0)  # GM-Right
+        self.labelCorrecting(outputVolume, outputVolume, 43, 0)  # GM-Left
+        self.labelCorrecting(outputVolume, outputVolume, 22, 0)  # WM-Right
+        self.labelCorrecting(outputVolume, outputVolume, 42, 0)  # WM-Left
+    else:
+        self.labelCorrecting(outputVolume, outputVolume, 21, 0)  # GM-Right
+        self.labelCorrecting(outputVolume, outputVolume, 41, 0)  # GM-Left
+        self.labelCorrecting(outputVolume, outputVolume, 22, 0)  # WM-Right
+        self.labelCorrecting(outputVolume, outputVolume, 42, 0)  # WM-Left
+
     slicer.util.showStatusMessage("Brain parcellation is finished...")
 
     if estimateBasalGanglia:
@@ -1481,6 +1532,19 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       slicer.util.showStatusMessage("Basal ganglia segmentation is finished...")
 
 
+    if applyMedianFiltering:
+      ######################################################################################
+      # Step  - Smoothing brain segmentation by median filtering
+      ######################################################################################
+      for i in range(0, interations):
+        params = {}
+        params['neighborhood'] = neighborSize
+        params['inputVolume'] = outputVolume
+        params['outputVolume'] = outputVolume
+
+        slicer.cli.run(slicer.modules.medianimagefilter, None, params, wait_for_completion=True)
+        slicer.util.showStatusMessage("OPTIONAL: Brain segmentation smoothing is finished...")
+
     # Setting Color Table with the USP_2018 pattern
     displayBrainLabel = outputVolume.GetDisplayNode()
     displayBrainLabel.SetAndObserveColorNodeID(ColorTableNode.GetID())
@@ -1508,7 +1572,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.RemoveNode(tmpVentriculesRegion)
     # slicer.mrmlScene.RemoveNode(brainOnlyVolume)
 
-    slicer.mrmlScene.RemoveNode(venctriculesMaskNode)
+    slicer.mrmlScene.RemoveNode(ventriculesMaskNode)
     slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
     slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
     slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
@@ -1696,6 +1760,30 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     params['neighborRadius'] = neighborRadius
 
     slicer.cli.run(slicer.modules.locallabelingcorrection, None, params, wait_for_completion=True)
+
+  #
+  # Global Contrast Enhancement
+  #
+  def imageGlobalConstrastEnhancement(self, inputNode
+                                      , outputNode
+                                      , algorithm
+                                      , lowerCut
+                                      , higherCut
+                                      , maximumScaling
+                                      , minimumScaling
+                                      , flipFunction):
+    params = {}
+    params["inputVolume"] = inputNode.GetID()
+    params["outputVolume"] = outputNode.GetID()
+    params["algorithm"] = algorithm
+    params["lowerCut"] = lowerCut
+    params["higherCut"] = higherCut
+    params["maximumScaling"] = maximumScaling
+    params["minimumScaling"] = minimumScaling
+    params["flipFunction"] = flipFunction
+
+    slicer.cli.run(slicer.modules.globalcontrastenhancer, None, params, wait_for_completion=True)
+
   #
   # Combine Labels
   #

@@ -7,6 +7,7 @@
 #include "itkBinaryThinningImageFilter.h"
 #include "itkBinaryContourImageFilter.h"
 #include "itkImageRegionIterator.h"
+#include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkNeighborhoodIterator.h"
 #include "itkConstantBoundaryCondition.h"
 #include "itkConstNeighborhoodIterator.h"
@@ -19,7 +20,7 @@
 
 #include "BrainVolumeRefinementCLP.h"
 
-
+#include <ctime>
 #include <sstream>
 // Use an anonymous namespace to keep class types and function names
 // from colliding when module is used as shared object module.  Every
@@ -33,6 +34,8 @@ template <typename TPixel>
 int DoIt( int argc, char * argv[], TPixel )
 {
     PARSE_ARGS;
+
+    std::clock_t begin = clock();
 
     typedef TPixel InputPixelType;
     typedef unsigned char LabelPixelType;
@@ -50,8 +53,9 @@ int DoIt( int argc, char * argv[], TPixel )
     inputReader->Update();
 
     typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType>             BinaryThresholdType;
-    typedef itk::BinaryContourImageFilter<LabelImageType, LabelImageType>               BinaryContourType;
-    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>              BinaryThinningType;
+    typedef itk::BinaryContourImageFilter<LabelImageType, InputImageType>               BinaryContourType;
+//    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>              BinaryThinningType;
+    typedef itk::SubtractImageFilter<InputImageType, InputImageType>                    SubtractLabelType;
     typedef itk::GradientMagnitudeImageFilter<InputImageType, InputImageType>           GradientMagnitudeType;
     typedef itk::MedianImageFilter<LabelImageType, LabelImageType>                      MedianFilterType;
     typedef itk::VotingBinaryIterativeHoleFillingImageFilter< LabelImageType >          VotingFillInType;
@@ -98,6 +102,13 @@ int DoIt( int argc, char * argv[], TPixel )
     newBrainMask->Allocate();
     newBrainMask->FillBuffer(0);
 
+    //Auxiliary skeleton to infer search path for each iteration
+    typename InputImageType::Pointer previousSkeleton = InputImageType::New();
+    previousSkeleton->CopyInformation(inputReader->GetOutput());
+    previousSkeleton->SetRegions(inputReader->GetOutput()->GetRequestedRegion());
+    previousSkeleton->Allocate();
+    previousSkeleton->FillBuffer(0);
+
     std::cout<<"*********************"<<std::endl;
     std::cout<<"BrainVolumeRefinement: Initiated"<<std::endl;
     std::cout<<"Iteration: ";
@@ -105,7 +116,8 @@ int DoIt( int argc, char * argv[], TPixel )
     for (int n = 0; n < numberOfIterations; ++n) {
         typename BinaryThresholdType::Pointer estimateMask = BinaryThresholdType::New();
         typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
-        typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
+//        typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
+        typename SubtractLabelType::Pointer actualContour = SubtractLabelType::New();
         typename GradientMagnitudeType::Pointer inputGrad = GradientMagnitudeType::New();
         typename BinaryThresholdType::Pointer newMask = BinaryThresholdType::New();
         typename MedianFilterType::Pointer median = MedianFilterType::New();
@@ -143,20 +155,107 @@ int DoIt( int argc, char * argv[], TPixel )
         maskContour->SetForegroundValue( 1 );
         maskContour->Update();
 
-        skeleton->SetInput(maskContour->GetOutput());
-        skeleton->Update();
+//        skeleton->SetInput(maskContour->GetOutput());
+//        skeleton->Update();
+
+//        typedef itk::ImageFileWriter<InputImageType> WriterType3;
+//        typename WriterType3::Pointer labelWriter3 = WriterType3::New();
+//        std::stringstream out2;
+//        out2<<"/home/antonio/Pictures/BVR_test/previousSkeleton"<<n<<"_label.nii.gz";
+//        labelWriter3->SetFileName( out2.str() );
+//        labelWriter3->SetInput( previousSkeleton );
+//        labelWriter3->SetUseCompression(1);
+//        labelWriter3->Update();
+
+        //Calculating the actual skeleton for iteration i and its major region
+        actualContour->SetInput1(maskContour->GetOutput());
+        actualContour->SetInput2(previousSkeleton);
+        actualContour->Update();
+
+
+//        typedef itk::ImageFileWriter<InputImageType> WriterType2;
+//        typename WriterType2::Pointer labelWriter2 = WriterType2::New();
+//        std::stringstream out;
+//        out<<"/home/antonio/Pictures/BVR_test/actualContour"<<n<<"_label.nii.gz";
+//        labelWriter2->SetFileName( out.str() );
+//        labelWriter2->SetInput( actualContour->GetOutput() );
+//        labelWriter2->SetUseCompression(1);
+//        labelWriter2->Update();
+
+
+
+        //Searching region
+        LabelImageType::SizeType windowSize;
+        LabelImageType::IndexType initIndex;
+        itk::ImageRegionConstIteratorWithIndex<InputImageType> modifyRegionIt(actualContour->GetOutput(),actualContour->GetOutput()->GetRequestedRegion());
+        int minX=itk::NumericTraits<int>::max(), maxX=0;
+        int minY=itk::NumericTraits<int>::max(), maxY=0;
+        int minZ=itk::NumericTraits<int>::max(), maxZ=0;
+        modifyRegionIt.GoToBegin();
+        while (!modifyRegionIt.IsAtEnd()) {
+            if (modifyRegionIt.Get()>static_cast<InputPixelType>(0)) {
+                //Finding minima
+                //X index
+                if (modifyRegionIt.GetIndex()[0] < minX) {
+                    minX = modifyRegionIt.GetIndex()[0];
+                }
+                //Y index
+                if (modifyRegionIt.GetIndex()[1] < minY) {
+                    minY = modifyRegionIt.GetIndex()[1];
+                }
+                //Z index
+                if (modifyRegionIt.GetIndex()[2] < minZ) {
+                    minZ = modifyRegionIt.GetIndex()[2];
+                }
+
+                //Finding maxima
+                //X index
+                if (modifyRegionIt.GetIndex()[0] > maxX) {
+                    maxX = modifyRegionIt.GetIndex()[0];
+                }
+                //Y index
+                if (modifyRegionIt.GetIndex()[1] > maxY) {
+                    maxY = modifyRegionIt.GetIndex()[1];
+                }
+                //Z index
+                if (modifyRegionIt.GetIndex()[2] > maxZ) {
+                    maxZ = modifyRegionIt.GetIndex()[2];
+                }
+            }
+            ++modifyRegionIt;
+        }
+        initIndex[0] = minX;
+        initIndex[1] = minY;
+        initIndex[2] = minZ;
+        windowSize[0] = (maxX - minX);
+        windowSize[1] = (maxY - minY);
+        windowSize[2] = (maxZ - minZ);
+
+        LabelImageType::RegionType searchingRegion;
+        if (updatedImage->GetRequestedRegion().GetSize()[0]>windowSize[0] ||
+                updatedImage->GetRequestedRegion().GetSize()[1]>windowSize[1] ||
+                updatedImage->GetRequestedRegion().GetSize()[2]>windowSize[2]) {
+            //If the estimated region is bigger than the original image, then do not change it (stopped by using the convergence criteria).
+            searchingRegion.SetIndex(initIndex);
+            searchingRegion.SetSize(windowSize);
+        }else{
+            stoppedByConvergence=true;
+            break;
+        }
+
+        std::cout<<"Searching region: "<<searchingRegion<<std::endl;
 
         // Run through the image gradient (using the countour) in order to find its boundaries
         inputGrad->SetInput(updatedImage);
         inputGrad->Update();
 
-        radius[0] = neighborRadius[0];
+        radius[0] = neighborRadius[0]; // TODO Fazer uma estimativa do tamanho do raio a partir do spacing (1,1,1 pode ser 3,3,3, mas 0.2,0.2,1.0 poderia ser 15,15,3 para manter a mesma proporcao de pixel sendo recrutados... deixar flag bool no XML para isto)
         radius[1] = neighborRadius[1];
         radius[2] = neighborRadius[2];
-        itk::ImageRegionIterator<LabelImageType> contourIt(skeleton->GetOutput(),skeleton->GetOutput()->GetRequestedRegion());
-        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > imageIt(radius, updatedImage,updatedImage->GetRequestedRegion());
-        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > gradIt(radius, inputGrad->GetOutput(),inputGrad->GetOutput()->GetRequestedRegion());
-        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > updateIt(radius, auxImage,auxImage->GetRequestedRegion());
+        itk::ImageRegionIterator<InputImageType> contourIt(actualContour->GetOutput(),searchingRegion);
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > imageIt(radius, updatedImage,searchingRegion);
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > gradIt(radius, inputGrad->GetOutput(),searchingRegion);
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > updateIt(radius, auxImage,searchingRegion);
 
         // Running over the both image and mask contour in order to find the closest voxel in the brain tissue.
         contourIt.GoToBegin();
@@ -167,7 +266,7 @@ int DoIt( int argc, char * argv[], TPixel )
         unsigned int N = (neighborRadius[0]*2 + 1)*(neighborRadius[1]*2 + 1)*(neighborRadius[2]*2 + 1);
         InputPixelType wGrad, wIntensity;
         while (!imageIt.IsAtEnd()) {
-            if (contourIt.Get()!=static_cast<LabelPixelType>(0)) {
+            if (contourIt.Get()>static_cast<LabelPixelType>(0)) {
                 //Calculating statistics into the neighborhood
                 wGrad=0.0;
                 wIntensity=0.0;
@@ -247,16 +346,22 @@ int DoIt( int argc, char * argv[], TPixel )
         maskInput->SetMaskImage(connectedMask->GetOutput());
         maskInput->Update();
 
+        previousSkeleton->FillBuffer(0);
         itk::ImageRegionIterator<InputImageType>    inIt(maskInput->GetOutput(), maskInput->GetOutput()->GetRequestedRegion());
         itk::ImageRegionIterator<InputImageType>    upIt(updatedImage, updatedImage->GetRequestedRegion());
         itk::ImageRegionIterator<InputImageType>    auxIt(auxImage, auxImage->GetRequestedRegion());
         itk::ImageRegionIterator<LabelImageType>    maskIt(connectedMask->GetOutput(), connectedMask->GetOutput()->GetRequestedRegion());
         itk::ImageRegionIterator<LabelImageType>    newMaskIt(newBrainMask, newBrainMask->GetRequestedRegion());
+        itk::ImageRegionIterator<InputImageType>    skIt(maskContour->GetOutput(), maskContour->GetOutput()->GetRequestedRegion());
+        itk::ImageRegionIterator<InputImageType>    prevSkIt(previousSkeleton, previousSkeleton->GetRequestedRegion());
+
         upIt.GoToBegin();
         auxIt.GoToBegin();
         inIt.GoToBegin();
         maskIt.GoToBegin();
         newMaskIt.GoToBegin();
+        skIt.GoToBegin();
+        prevSkIt.GoToBegin();
         while (!upIt.IsAtEnd()) {
             //Copy updated and auxliary images
             upIt.Set(inIt.Get());
@@ -265,11 +370,16 @@ int DoIt( int argc, char * argv[], TPixel )
             //Copy brain mask
             newMaskIt.Set(maskIt.Get());
 
+            //Copy searching path
+            prevSkIt.Set(skIt.Get());
+
             ++upIt;
             ++auxIt;
             ++inIt;
             ++maskIt;
             ++newMaskIt;
+            ++skIt;
+            ++prevSkIt;
         }
 
         //Calculating the brain volume of iteration i+1
@@ -297,8 +407,10 @@ int DoIt( int argc, char * argv[], TPixel )
         labelWriter->SetUseCompression(1);
         labelWriter->Update();
     }
+    std::clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
 
-    std::cout<<"finished!"<<std::endl;
+    std::cout<<"finished! Total processing time of: "<<elapsed_secs/60.0<<" minutes"<<std::endl;
     std::cout<<"*********************"<<std::endl;
 
     //Informs what stopping criteria was reached first.

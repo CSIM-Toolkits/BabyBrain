@@ -70,7 +70,7 @@
       <longflag>--useMedianFilter</longflag>
       <description><![CDATA[Choose if you want to use a median filtering process in order to smooth the final brain mask. If checked, the Median Radius will be used.]]></description>
       <label>Use Median Filter</label>
-      <default>true</default>
+      <default>false</default>
     </boolean>
     <integer-vector>
       <name>medianRadius</name>

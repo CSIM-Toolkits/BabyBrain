@@ -4,7 +4,6 @@
 #include "itkConnectedComponentImageFilter.h"
 #include "itkRelabelComponentImageFilter.h"
 #include "itkBinaryThresholdImageFilter.h"
-#include "itkBinaryThinningImageFilter.h"
 #include "itkBinaryContourImageFilter.h"
 #include "itkImageRegionIterator.h"
 #include "itkImageRegionConstIteratorWithIndex.h"
@@ -54,7 +53,6 @@ int DoIt( int argc, char * argv[], TPixel )
 
     typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType>             BinaryThresholdType;
     typedef itk::BinaryContourImageFilter<LabelImageType, InputImageType>               BinaryContourType;
-//    typedef itk::BinaryThinningImageFilter<LabelImageType, LabelImageType>              BinaryThinningType;
     typedef itk::SubtractImageFilter<InputImageType, InputImageType>                    SubtractLabelType;
     typedef itk::GradientMagnitudeImageFilter<InputImageType, InputImageType>           GradientMagnitudeType;
     typedef itk::MedianImageFilter<LabelImageType, LabelImageType>                      MedianFilterType;
@@ -116,7 +114,6 @@ int DoIt( int argc, char * argv[], TPixel )
     for (int n = 0; n < numberOfIterations; ++n) {
         typename BinaryThresholdType::Pointer estimateMask = BinaryThresholdType::New();
         typename BinaryContourType::Pointer maskContour = BinaryContourType::New();
-//        typename BinaryThinningType::Pointer skeleton = BinaryThinningType::New();
         typename SubtractLabelType::Pointer actualContour = SubtractLabelType::New();
         typename GradientMagnitudeType::Pointer inputGrad = GradientMagnitudeType::New();
         typename BinaryThresholdType::Pointer newMask = BinaryThresholdType::New();
@@ -155,34 +152,10 @@ int DoIt( int argc, char * argv[], TPixel )
         maskContour->SetForegroundValue( 1 );
         maskContour->Update();
 
-//        skeleton->SetInput(maskContour->GetOutput());
-//        skeleton->Update();
-
-//        typedef itk::ImageFileWriter<InputImageType> WriterType3;
-//        typename WriterType3::Pointer labelWriter3 = WriterType3::New();
-//        std::stringstream out2;
-//        out2<<"/home/antonio/Pictures/BVR_test/previousSkeleton"<<n<<"_label.nii.gz";
-//        labelWriter3->SetFileName( out2.str() );
-//        labelWriter3->SetInput( previousSkeleton );
-//        labelWriter3->SetUseCompression(1);
-//        labelWriter3->Update();
-
         //Calculating the actual skeleton for iteration i and its major region
         actualContour->SetInput1(maskContour->GetOutput());
         actualContour->SetInput2(previousSkeleton);
         actualContour->Update();
-
-
-//        typedef itk::ImageFileWriter<InputImageType> WriterType2;
-//        typename WriterType2::Pointer labelWriter2 = WriterType2::New();
-//        std::stringstream out;
-//        out<<"/home/antonio/Pictures/BVR_test/actualContour"<<n<<"_label.nii.gz";
-//        labelWriter2->SetFileName( out.str() );
-//        labelWriter2->SetInput( actualContour->GetOutput() );
-//        labelWriter2->SetUseCompression(1);
-//        labelWriter2->Update();
-
-
 
         //Searching region
         LabelImageType::SizeType windowSize;
@@ -281,9 +254,9 @@ int DoIt( int argc, char * argv[], TPixel )
 
                 //Cutting out voxels that does not belongs to the brain based on the mean of the local gradient and mean gray level intensity
                 for (unsigned int p = 0; p < N; p++) {
-                    if (imageIt.GetPixel(p)!=0) {
+                    if (imageIt.GetPixel(p)!=static_cast<InputPixelType>(0)) {
                         if (gradIt.GetPixel(p) < (wGrad) && imageIt.GetPixel(p) < (wIntensity)){
-                            updateIt.SetPixel(p, 0);
+                            updateIt.SetPixel(p, static_cast<InputPixelType>(0));
                         }
                     }
                 }
@@ -302,7 +275,7 @@ int DoIt( int argc, char * argv[], TPixel )
         newMask->SetUpperThreshold(itk::NumericTraits<InputPixelType>::max());
         newMask->SetInsideValue(1.0);
 
-        if (useMedianFilter) {
+
             //Median filter in the input image
             median->SetInput(newMask->GetOutput());
             MedianFilterType::RadiusType mRadius;
@@ -310,23 +283,25 @@ int DoIt( int argc, char * argv[], TPixel )
             mRadius[1] = medianRadius[1];
             mRadius[2] = medianRadius[2];
             median->SetRadius(mRadius);
-        }
+
 
         //Filling in the holes in the updated brain mask
-        //Finding the bigger size of the median filter
-        int r = 0;
-        for (unsigned int i = 0; i < Dimension; ++i) {
-            if (medianRadius[i]>r) {
-                r=medianRadius[i];
-            }
-        }
-        vRadius.Fill( r );
-        (useMedianFilter)?fillInHoles->SetInput( median->GetOutput() ):fillInHoles->SetInput( newMask->GetOutput() );
+        //Finding the smaller size of the chosen neighborhood
+//        int r = itk::NumericTraits<LabelPixelType>::max();
+//        for (unsigned int i = 0; i < Dimension; ++i) {
+//            if (neighborRadius[i]<r) {
+//                r=neighborRadius[i];
+//            }
+//        }
+//        vRadius.Fill( r );
+        vRadius.Fill(1);
+        fillInHoles->SetInput( median->GetOutput() );
         fillInHoles->SetRadius( vRadius );
         fillInHoles->SetMajorityThreshold( majorityThreshold );
         fillInHoles->SetBackgroundValue( 0 );
         fillInHoles->SetForegroundValue( 1 );
-        fillInHoles->SetMaximumNumberOfIterations( 100 ); // a default number of iterations to a general case
+        fillInHoles->SetMaximumNumberOfIterations( 200 ); // an enough number of iterations to the majority of cases...
+        fillInHoles->Update();
 
         //Removing non-connected regions left in the brain mask
         connLabel->SetInput(fillInHoles->GetOutput());
@@ -363,7 +338,7 @@ int DoIt( int argc, char * argv[], TPixel )
         skIt.GoToBegin();
         prevSkIt.GoToBegin();
         while (!upIt.IsAtEnd()) {
-            //Copy updated and auxliary images
+            //Copy updated and auxiliary images
             upIt.Set(inIt.Get());
             auxIt.Set(inIt.Get());
 

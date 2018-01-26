@@ -65,13 +65,6 @@
       <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. This is a up limit threshold in order to avoid infinity loop in the brain volume correction. If the tolerance level does not reaches a stable results, then the number of iteration limit will stop de algorithm.]]></description>
       <default>20</default>
     </integer>
-    <boolean>
-      <name>useMedianFilter</name>
-      <longflag>--useMedianFilter</longflag>
-      <description><![CDATA[Choose if you want to use a median filtering process in order to smooth the final brain mask. If checked, the Median Radius will be used.]]></description>
-      <label>Use Median Filter</label>
-      <default>false</default>
-    </boolean>
     <integer-vector>
       <name>medianRadius</name>
       <longflag>--medianRadius</longflag>

@@ -37,7 +37,7 @@ int DoIt( int argc, char * argv[], TPixel )
     std::clock_t begin = clock();
 
     typedef TPixel InputPixelType;
-    typedef unsigned char LabelPixelType;
+    typedef unsigned short LabelPixelType;
 
     const unsigned int Dimension = 3;
 
@@ -276,13 +276,13 @@ int DoIt( int argc, char * argv[], TPixel )
         newMask->SetInsideValue(1.0);
 
 
-            //Median filter in the input image
-            median->SetInput(newMask->GetOutput());
-            MedianFilterType::RadiusType mRadius;
-            mRadius[0] = medianRadius[0];
-            mRadius[1] = medianRadius[1];
-            mRadius[2] = medianRadius[2];
-            median->SetRadius(mRadius);
+        //Median filter in the input image
+        median->SetInput(newMask->GetOutput());
+        MedianFilterType::RadiusType mRadius;
+        mRadius[0] = medianRadius[0];
+        mRadius[1] = medianRadius[1];
+        mRadius[2] = medianRadius[2];
+        median->SetRadius(mRadius);
 
 
         //Filling in the holes in the updated brain mask

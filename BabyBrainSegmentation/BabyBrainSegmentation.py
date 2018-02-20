@@ -228,7 +228,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     self.setBrainAtlasComboBoxWidget = ctk.ctkComboBox()
     self.setBrainAtlasComboBoxWidget.addItem("NEO2012") # TODO Ver se usa tambem outro template (2015, http://brain-development.org/brain-atlases/multi-structural-neonatal-brain-atlas/)
     # self.setBrainAtlasComboBoxWidget.addItem("NEO2015") # TODO Novo brain atlas com o mesmo padrao do NEO2012... tem mais detalhes de segmentacao
-    self.setBrainAtlasComboBoxWidget.addItem("FET2012") # TODO Preparar cerebellum e brainstem.
+    self.setBrainAtlasComboBoxWidget.addItem("FET2012")
     # self.setBrainAtlasComboBoxWidget.addItem("PED2008") # TODO PED2008 will be availble in further upgrade
     self.setBrainAtlasComboBoxWidget.setToolTip(
       "Choose the most suitable brain atlas for the input image. A list of available atlas are given, however only the "
@@ -1338,6 +1338,18 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
       slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
       slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
       slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+      slicer.mrmlScene.RemoveNode(tmpCerebellumPriors)
+      slicer.mrmlScene.RemoveNode(cerebellumPriorsNode)
+      slicer.mrmlScene.RemoveNode(tmpCSFCerebellumPriors)
+      slicer.mrmlScene.RemoveNode(csfCerebellumPriorsNode)
+      slicer.mrmlScene.RemoveNode(tmpBrainstemPriors)
+      slicer.mrmlScene.RemoveNode(brainstemPriorsNode)
+      slicer.mrmlScene.RemoveNode(tmpCSFBrainstemPriors)
+      slicer.mrmlScene.RemoveNode(csfBrainstemPriorsNode)
+      slicer.mrmlScene.RemoveNode(backgroundForCerebellumPrior)
+      slicer.mrmlScene.RemoveNode(backgroundForBrainstemPrior)
+      slicer.mrmlScene.RemoveNode(tmpCSFNode)
+
       slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
       slicer.mrmlScene.RemoveNode(brainstemMaskNode)
       slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
@@ -1559,6 +1571,18 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.RemoveNode(tmpCerebellumMask)
     slicer.mrmlScene.RemoveNode(cerebellumOnlyLabelMask)
     slicer.mrmlScene.RemoveNode(cerebellumMaskNode)
+    slicer.mrmlScene.RemoveNode(tmpCerebellumPriors)
+    slicer.mrmlScene.RemoveNode(cerebellumPriorsNode)
+    slicer.mrmlScene.RemoveNode(tmpCSFCerebellumPriors)
+    slicer.mrmlScene.RemoveNode(csfCerebellumPriorsNode)
+    slicer.mrmlScene.RemoveNode(tmpBrainstemPriors)
+    slicer.mrmlScene.RemoveNode(brainstemPriorsNode)
+    slicer.mrmlScene.RemoveNode(tmpCSFBrainstemPriors)
+    slicer.mrmlScene.RemoveNode(csfBrainstemPriorsNode)
+    slicer.mrmlScene.RemoveNode(backgroundForCerebellumPrior)
+    slicer.mrmlScene.RemoveNode(backgroundForBrainstemPrior)
+    slicer.mrmlScene.RemoveNode(tmpCSFNode)
+
     slicer.mrmlScene.RemoveNode(tmpBrainstemMask)
     slicer.mrmlScene.RemoveNode(brainstemMaskNode)
     slicer.mrmlScene.RemoveNode(tmpBrainOnlyNode)
@@ -1567,16 +1591,18 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     slicer.mrmlScene.RemoveNode(brainstemOnlyLabelMask)
     slicer.mrmlScene.RemoveNode(brainstemPlusCerebellumLabelMask)
     slicer.mrmlScene.RemoveNode(brainOnlyLabelMask)
-    slicer.mrmlScene.RemoveNode(csfCorrectionLabelMask)
     slicer.mrmlScene.RemoveNode(ventriculesCorrectionLabelMask)
     slicer.mrmlScene.RemoveNode(tmpVentriculesRegion)
-    # slicer.mrmlScene.RemoveNode(brainOnlyVolume)
-
     slicer.mrmlScene.RemoveNode(ventriculesMaskNode)
     slicer.mrmlScene.RemoveNode(tmpVentriculesLabelMask)
+    slicer.mrmlScene.RemoveNode(tmpGMPlusWMNode)
+    slicer.mrmlScene.RemoveNode(tmpGMAndWMVolume)
+    slicer.mrmlScene.RemoveNode(tmpCSFVolume)
+
     slicer.mrmlScene.RemoveNode(hemispheresMaskNode)
     slicer.mrmlScene.RemoveNode(tmpHemispheresLabelMask)
     slicer.mrmlScene.RemoveNode(brainOnlyHemispheresLabelMask)
+    # slicer.mrmlScene.RemoveNode(brainOnlyVolume)
 
     if estimateBasalGanglia:
       slicer.mrmlScene.RemoveNode(tmpDeepGMLabelMask)

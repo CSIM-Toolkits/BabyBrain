@@ -6,6 +6,10 @@ set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
   )
 
+# Scripts
+file(GLOB BabyBrain_Segmentation_Script RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/runBabyBrainSegmentation")
+file(GLOB BabyBrain_Preparation_Script RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/runBabyBrainPreparation")
+
 # NEO2012 Brain Atlas
 file(GLOB BabyBrain_NEO2012_Atlases_Hemispheres RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/NEO2012/*.nii.gz")
 file(GLOB BabyBrain_NEO2012_Atlases_Brainmask RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/atlases/NEO2012/brainmask/*.nii.gz")
@@ -28,6 +32,9 @@ file(GLOB BabyBrain_FET2012_Templates RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Re
 file(GLOB BabyBrain_ColorTables RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "Resources/*.ctbl")
 set(MODULE_PYTHON_RESOURCES
   Resources/Icons/${MODULE_NAME}.png
+  ${BabyBrain_Segmentation_Script}
+  ${BabyBrain_Preparation_Script}
+
   ${BabyBrain_NEO2012_Atlases_Hemispheres}
   ${BabyBrain_NEO2012_Atlases_Brainmask}
   ${BabyBrain_NEO2012_Atlases_Brainstem}

@@ -131,7 +131,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     #
     parametersImageResamplingCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersImageResamplingCollapsibleButton.text = "Image Space Resampling Parameters"
-    parametersImageResamplingCollapsibleButton.collapsed = True
+    parametersImageResamplingCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersImageResamplingCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -168,7 +168,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     #
     parametersMedianFilterCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersMedianFilterCollapsibleButton.text = "Median Filter Parameters"
-    parametersMedianFilterCollapsibleButton.collapsed = True
+    parametersMedianFilterCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersMedianFilterCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -216,7 +216,7 @@ class BabyBrainSegmentationWidget(ScriptedLoadableModuleWidget):
     #
     parametersAtlasPropagationCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersAtlasPropagationCollapsibleButton.text = "Atlas Propagation Parameters"
-    parametersAtlasPropagationCollapsibleButton.collapsed = True
+    parametersAtlasPropagationCollapsibleButton.collapsed = False
     self.layout.addWidget(parametersAtlasPropagationCollapsibleButton)
 
     # Layout within the dummy collapsible button
@@ -1267,7 +1267,7 @@ class BabyBrainSegmentationLogic(ScriptedLoadableModuleLogic):
     self.combineLabels(tmpCSFNode, tmpGMPlusWMNode, brainOnlyLabelMask, firstOverwrites=False)
 
     # End segmentation process with only a global tissue segmentation.
-    if not splitHemispheres:
+    if not splitHemispheres: #TODO Verificar porque quando faz o split o brainstem e cerebellum ficam com labels erradas
       ######################################################################################
       # Step  - Merging brainstem, cerebellum and brain hemispheres all the tissues together
       ######################################################################################

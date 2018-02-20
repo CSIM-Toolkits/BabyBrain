@@ -7,7 +7,7 @@
   <documentation-url>https://www.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/SplitLabelValues</documentation-url>
   <license>Slicer</license>
   <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo)</contributor>
-  <acknowledgements>This work was partially funded by CNPq grant ...</acknowledgements>
+  <acknowledgements>This work was partially funded by CNPq grant 405574/2017-7</acknowledgements>
   <parameters>
     <label>IO</label>
     <description><![CDATA[Input/output parameters]]></description>

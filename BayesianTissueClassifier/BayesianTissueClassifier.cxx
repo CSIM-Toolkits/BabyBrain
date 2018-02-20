@@ -6,6 +6,9 @@
 #include "itkDivideImageFilter.h"
 #include "itkBayesianClassifierImageFilter.h"
 #include "itkBayesianClassifierInitializationImageFilter.h"
+#include "itkSubtractImageFilter.h"
+#include "itkAbsImageFilter.h"
+#include "itkComposeImageFilter.h"
 #include "itkConnectedComponentImageFilter.h"
 #include "itkRelabelComponentImageFilter.h"
 #include "itkBinaryThresholdImageFilter.h"
@@ -35,16 +38,17 @@ int DoIt( int argc, char * argv[], T )
     typedef itk::Image<OutputPixelType, Dimension> OutputImageType;
 
     typedef itk::ImageFileReader<InputImageType>    ReaderType;
+    typedef itk::ImageFileReader<InputImageType>    PriorsReaderType;
 
-    typename ReaderType::Pointer reader = ReaderType::New();
-    reader->SetFileName( inputVolume.c_str() );
-    reader->Update();
+    typename ReaderType::Pointer inputReader = ReaderType::New();
+    inputReader->SetFileName( inputVolume.c_str() );
+    inputReader->Update();
 
     //Bayesian Segmentation Approach
     typedef itk::BayesianClassifierInitializationImageFilter< InputImageType >         BayesianInitializerType;
     typename BayesianInitializerType::Pointer bayesianInitializer = BayesianInitializerType::New();
 
-    bayesianInitializer->SetInput( reader->GetOutput() );
+    bayesianInitializer->SetInput( inputReader->GetOutput() );
     bayesianInitializer->SetNumberOfClasses( numberOfTissues );// Background, WM, GM and CSF are defined as 4 tissues
     bayesianInitializer->Update();
 
@@ -52,10 +56,35 @@ int DoIt( int argc, char * argv[], T )
     typedef float          PosteriorType;
 
     typedef itk::VectorImage< InputPixelType, Dimension > VectorInputImageType;
+
     typedef itk::BayesianClassifierImageFilter< VectorInputImageType,OutputPixelType, PosteriorType,PriorType >   ClassifierFilterType;
     typename ClassifierFilterType::Pointer bayesClassifier = ClassifierFilterType::New();
 
     bayesClassifier->SetInput( bayesianInitializer->GetOutput() );
+
+    if (!inputPriorsFile.empty()) {
+        std::vector<InputImageType::Pointer> inputPriors;
+        for (unsigned int prior = 0; prior < inputPriorsFile.size(); ++prior) {
+            std::cout<<"Using tissues priors ("<<(prior+1)<<") at location: "<<inputPriorsFile[prior].c_str()<<std::endl;
+
+            typename PriorsReaderType::Pointer priorsReader = PriorsReaderType::New();
+            priorsReader->SetFileName( inputPriorsFile[prior].c_str() );
+            priorsReader->Update();
+            inputPriors.push_back(priorsReader->GetOutput());
+        }
+
+        //Creating the bayesian input priors
+        typedef itk::ComposeImageFilter<InputImageType, VectorInputImageType> ComposeType;
+        typename ComposeType::Pointer priorsImage = ComposeType::New();
+
+        for (unsigned int prior = 0; prior < inputPriors.size(); ++prior) {
+            priorsImage->SetInput(prior, inputPriors[prior]);
+        }
+        priorsImage->Update();
+
+        std::cout << "Image priors with "<<priorsImage->GetOutput()->GetNumberOfComponentsPerPixel() <<" number of components." << std::endl;
+        bayesClassifier->SetPriors( priorsImage->GetOutput() );
+    }
 
     if (imageModality=="T1") {
         if (oneTissue) {

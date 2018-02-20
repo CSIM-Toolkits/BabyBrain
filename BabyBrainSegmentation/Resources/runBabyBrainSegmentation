@@ -1,0 +1,346 @@
+#!/bin/bash
+
+VERSION="0.0.1 beta"
+
+# trap keyboard interrupt (control-c)
+trap control_c SIGINT
+
+function Usage {
+    cat <<USAGE
+
+Usage:
+
+`basename $0` -i InputImage -o OutputTissuesLabel -t ImageModality
+
+Compulsory arguments:
+
+     -i:  Input image
+
+     -o:  Output the brain tissue segmentation from the input image
+
+     -t:  Image modality that describe the input image, which may be T1 or T2. (Default: T2)
+
+Optional arguments:
+
+     -b:  Choose if you want to estimate the basal ganglia structures. This process is a simple atlas propagation in the native space using the affine and diffeomorphic transforms.
+
+     -s:  Split brain hemispheres. This will define both right and left brain hemispheres with different label values. Cerebellum and brainstem are not modified.
+
+     -r:  Voxel resampling resolution given in mm. This will transform the input image to a different resolution (Default: 0.2,0.2,1)
+
+     -m:  Apply a median filtering process over the final label map with the defined neighborhood size.
+
+     -a:  Brain atlas, which can be the fetal or neonatal options. OPTIONS: FET2012 or NEO2012. (Default: NEO2012)
+
+     -y:  Age of the subject in months. Note that depending of the chosen brain atlas, the age limits may change. (Default: 26)
+
+     -e:  Choose it only if the registration transforms were saved in the previous BabyBrainPreparation module. The script will try to read the affine and diffeomorphic transforms from the input folder, using a standard naming files.
+
+     -d:  Specify the full path to the Slicer executable file which the BabyBrain extension was installed. This is important if 3DSlicer was not added in the standard \$PATH of the system.
+
+Example:
+
+`basename $0` -i inputImage.nii.gz -o brainTissues_label.nii.gz -t T2 -b -s -m 2,2,1 -e
+
+--------------------------------------------------------------------------------------
+BabyBrain was created by:
+--------------------------------------------------------------------------------------
+Antonio Carlos da S. Senra Filho
+Computing in Signal and Images in Medicine (CSIM) Laboratory
+University of Sao Paulo, Brazil
+
+script by Antonio Carlos
+
+USAGE
+    exit 1
+}
+
+function Help {
+    cat <<HELP
+
+Usage:
+
+`basename $0` -i InputImage -o OutputTissuesLabel -t ImageModality
+
+Compulsory arguments:
+
+     -i:  Input image
+
+     -o:  Output the brain tissue segmentation from the input image
+
+     -t:  Image modality that describe the input image, which may be T1 or T2. (Default: T2)
+
+Optional arguments:
+
+     -b:  Choose if you want to estimate the basal ganglia structures. This process is a simple atlas propagation in the native space using the affine and diffeomorphic transforms.
+
+     -s:  Split brain hemispheres. This will define both right and left brain hemispheres with different label values. Cerebellum and brainstem are not modified.
+
+     -r:  Voxel resampling resolution given in mm. This will transform the input image to a different resolution (Default: 0.2,0.2,1)
+
+     -m:  Apply a median filtering process over the final label map with the defined neighborhood size.
+
+     -a:  Brain atlas, which can be the fetal or neonatal options. OPTIONS: FET2012 or NEO2012. (Default: NEO2012)
+
+     -y:  Age of the subject in months. Note that depending of the chosen brain atlas, the age limits may change. (Default: 26)
+
+     -e:  Choose it only if the registration transforms were saved in the previous BabyBrainPreparation module. The script will try to read the affine and diffeomorphic transforms from the input folder, using a standard naming files.
+
+     -d:  Specify the full path to the Slicer executable file which the BabyBrain extension was installed. This is important if 3DSlicer was not added in the standard \$PATH of the system.
+
+Example:
+
+`basename $0` -i inputImage.nii.gz -o brainTissues_label.nii.gz -t T2 -b -s -m 2,2,1 -e
+
+--------------------------------------------------------------------------------------
+BabyBrain was created by:
+--------------------------------------------------------------------------------------
+Antonio Carlos da S. Senra Filho
+Computing in Signal and Images in Medicine (CSIM) Laboratory
+University of Sao Paulo, Brazil
+
+script by Antonio Carlos
+
+--------------------------------------------------------------------------------------
+Get the latest BabyBrain version at:
+--------------------------------------------------------------------------------------
+https://github.com/CSIM-Toolkits/BabyBrain
+
+--------------------------------------------------------------------------------------
+Read the BabyBrain documentation at:
+--------------------------------------------------------------------------------------
+http://slicer.org/slicerWiki/index.php/Documentation/Nightly/Extensions/BabyBrain
+
+HELP
+    exit 1
+}
+
+function reportMappingParameters {
+    cat <<REPORTMAPPINGPARAMETERS
+
+--------------------------------------------------------------------------------------
+ Mapping parameters
+--------------------------------------------------------------------------------------
+ Slicer executable:         $SLICER
+ Input image:               $INPUTIMAGE
+ Output Label:              $OUTPUTLABEL
+ Image modality:            $IMAGEMODALITY_SHOW
+ Image resampling:          $RESAMPLING
+ Median filter size:        $MEDIANSIZE
+ Brain atlas:               $BRAINATLAS_SHOW
+ Age:                       $AGE
+======================================================================================
+REPORTMAPPINGPARAMETERS
+}
+
+control_c()
+# run if user hits control-c
+{
+  echo -en "\n*** User pressed CTRL + C ***\n"
+  exit $?
+  echo -en "\n*** Script cancelled by user ***\n"
+}
+
+# Provide output for Help
+if [[ "$1" == "-h" || $# -eq 0 ]];
+  then
+    Help >&2
+  fi
+
+#################
+#
+# default values
+#
+#################
+SLICER=`which Slicer`
+
+INPUTIMAGE=""
+OUTPUTLABEL=""
+IMAGEMODALITY_SHOW="T2"
+IMAGEMODALITY=0
+RESAMPLING="0.2,0.2,1"
+BRAINATLAS_SHOW="NEO2012"
+BRAINATLAS=0
+AGE="26"
+MEDIANSIZE=""
+ESTIMATEBASALGANGLIA=0
+SPLITHEMISPHERES=0
+LOADTRANSFORMS=0
+
+# reading command line arguments
+while getopts "i:o:t:bsr:m:a:y:ed:" OPT
+  do
+  case $OPT in
+      h) #help
+   Help
+   exit 0
+   ;;
+      i)  # input image
+   INPUTIMAGE=$OPTARG
+   ;;
+      o)  # output image
+   OUTPUTLABEL=$OPTARG
+   ;;
+      t)  # image modality
+   IMAGEMODALITY_SHOW=$OPTARG
+   ;;
+      b)  # Estimate basal ganglia
+   ESTIMATEBASALGANGLIA="1"
+   ;;
+      s)  # Split hemispheres
+   SPLITHEMISPHERES="1"
+   ;;
+      r)  # image resampling
+   RESAMPLING=$OPTARG
+   ;;
+      m)  # median filter
+   MEDIANSIZE=$OPTARG
+   ;;
+      a)  # brain atlas
+   BRAINATLAS_SHOW=$OPTARG
+   ;;
+      y)  # age
+   AGE=$OPTARG
+   ;;
+      d)  # Slicer executable
+   SLICER=$OPTARG
+   ;;
+      e)  # Load transforms
+   LOADTRANSFORMS=1
+   ;;
+     \?) # getopts issues an error message
+   echo "$USAGE" >&2
+   exit 1
+   ;;
+  esac
+done
+
+###############################
+#
+# Check inputs variables
+#
+###############################
+#Checking if Slicer executable is placed in PATH
+if [[ "$SLICER" == "" ]]; then
+    echo "Slicer executable was not found"
+    echo "  Set the Slicer executable to the system path in order to found by the script."
+    exit 1
+fi
+
+if [[ ! -e $INPUTIMAGE ]]; then
+  echo "Input image does not exist."
+  exit 1
+fi
+
+if [[ ! -e $(dirname $OUTPUTLABEL) ]]; then
+  echo "Output folder path does not exist."
+  exit 1
+fi
+
+if [[ "$IMAGEMODALITY_SHOW" == "T1" ]]; then
+  IMAGEMODALITY=1
+elif [[ "$IMAGEMODALITY_SHOW" == "T2" ]]; then
+  IMAGEMODALITY=0
+else
+  echo "Image modality type is not available. OPTIONS: T1 or T2."
+  exit 1
+fi
+
+if [[ "$BRAINATLAS_SHOW" == "NEO2012" ]]; then
+  BRAINATLAS=0
+elif [[ "$BRAINATLAS_SHOW" == "FET2012" ]]; then
+  BRAINATLAS=1
+else
+  echo "Brain atlas type is not available. OPTIONS: FET2012 or NEO2012."
+  exit 1
+fi
+
+if [[ $AGE -le 0 ]]; then
+  echo "Age must be an integer greater than zero."
+  exit 1
+fi
+
+if [[ "$LOADTRANSFORMS" == "1" ]]; then
+  if [[ ! -e "$(dirname $INPUTIMAGE)/BabyBrain_regMNI2Native_0GenericAffine.mat" ]]; then
+    echo "Affine transform does not exist. Check the input folder if the BabyBrain_regMNI2Native_0GenericAffine.mat file exist."
+    exit 1
+  fi
+
+  if [[ ! -e "$(dirname $INPUTIMAGE)/BabyBrain_regMNI2Native_1Warp.nii.gz" ]]; then
+    echo "Diffeomorphic transform does not exist. Check the input folder if the BabyBrain_regMNI2Native_1Warp.nii.gz file exist."
+    exit 1
+  fi
+fi
+
+
+##############################
+#
+# Print out options
+#
+##############################
+
+reportMappingParameters
+
+#Create temporary python script in the input folder
+TMPATH=$(dirname $INPUTIMAGE)
+cat << EOF > ${TMPATH}/tmp_babybrainsegmentation.py
+slicer.modules.babybrainsegmentation.createNewWidgetRepresentation()
+module=slicer.modules.BabyBrainSegmentationWidget
+
+#Setting the input and output images
+(success, inputNode)=slicer.util.loadVolume("$INPUTIMAGE", returnNode=True)
+module.inputSelector.setCurrentNode(inputNode)
+outputNode=slicer.vtkMRMLLabelMapVolumeNode()
+slicer.mrmlScene.AddNode(outputNode)
+module.brainTissuesSelector.setCurrentNode(outputNode)
+
+#Image modality
+module.setImageModalityBooleanWidget.setCurrentIndex($IMAGEMODALITY)
+
+#Estimate basal ganglia
+if "$ESTIMATEBASALGANGLIA" is "1":
+    module.setUseBasalGangliaEstimatorBooleanWidget.setChecked(True)
+else:
+    module.setUseBasalGangliaEstimatorBooleanWidget.setChecked(False)
+
+#Split hemispheres
+if "$SPLITHEMISPHERES" is "1":
+    module.setUseSplitBrainHemispheresBooleanWidget.setChecked(True)
+else:
+    module.setUseSplitBrainHemispheresBooleanWidget.setChecked(False)
+
+
+#Image resampling
+module.setVoxelResolutionLineEditWidget.setText("$RESAMPLING")
+
+#Brain atlas
+module.setBrainAtlasComboBoxWidget.setCurrentIndex($BRAINATLAS)
+
+#Age
+module.setSubjectAgeIntegerWidget.setValue($AGE)
+
+if "$MEDIANSIZE" is not "":
+    #Apply Median filter
+    module.setApplyMedianFilteringBooleanWidget.setChecked(True)
+
+    #Neighborhood size
+    module.setNeighborhoodSizeLineEditWidget.setText("$NEIGHBORSIZE")
+else:
+    module.setApplyMedianFilteringBooleanWidget.setChecked(False)
+
+if "$LOADTRANSFORMS" is "1":
+    slicer.util.loadTransform("$(dirname $INPUTIMAGE)/BabyBrain_regMNI2Native_0GenericAffine.mat")
+    slicer.util.loadTransform("$(dirname $INPUTIMAGE)/BabyBrain_regMNI2Native_1Warp.nii.gz")
+
+module.applyButton.click()
+
+slicer.util.saveNode(outputNode, "$OUTPUTLABEL")
+
+exit(EXIT_SUCCESS)
+EOF
+
+#Run the script
+$SLICER --no-main-window --python-script ${TMPATH}/tmp_babybrainsegmentation.py
+
+#Erasing the python script generated here
+rm ${TMPATH}/tmp_babybrainsegmentation.py

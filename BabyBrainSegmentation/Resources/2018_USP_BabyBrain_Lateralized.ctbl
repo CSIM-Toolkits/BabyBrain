@@ -1,0 +1,11 @@
+0 background 0 0 0 0
+3 CSF 72 209 204 255                    # mediumturquoise
+4 Brainstem 255 165 0 255               # orange
+5 Cerebrellum 218 112 214 255           # orchid
+6 Basal-Ganglia 189 183 107 255         # darkkhaki
+21 Right-Gray-Matter 220 20 60 255      # crimson
+22 Right-White-Matter 255 248 220 255   # cornsilk
+30 Right-Ventricules 50 205 50 255     # limegreen
+41 Left-Gray-Matter 210 105 30 255      # chocolate
+42 Left-White-Matter 245 255 250 255    # mintcream
+50 Left-Ventricules 0 255 0 255         # lime

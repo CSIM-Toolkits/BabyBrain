@@ -7,7 +7,7 @@
   <documentation-url>https://www.slicer.org/slicerWiki/index.php/Documentation/Nightly/Modules/BayesianTissueClassifier</documentation-url>
   <license>Slicer</license>
   <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo)</contributor>
-  <acknowledgements>This work was partially funded by CNPq grant ...</acknowledgements>
+  <acknowledgements>This work was partially funded by CNPq grant 405574/2017-7</acknowledgements>
   <parameters>
     <label>IO</label>
     <description><![CDATA[Input/output parameters]]></description>
@@ -28,6 +28,12 @@
 	      <element>T2</element>
 	      <element>PD</element>
 	</string-enumeration>
+    <string-vector>
+      <name>inputPriorsFile</name>
+      <longflag>--priorsFile</longflag>
+      <label>Input Priors Probability</label>
+      <description><![CDATA[A comma separated list of probability priors for the input image. If this is empty, the naive Bayes classification is performed]]></description>
+    </string-vector>
     <integer>
       <name>numberOfTissues</name>
       <longflag>--nTissues</longflag>

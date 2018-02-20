@@ -1,0 +1,427 @@
+#!/bin/bash
+
+VERSION="0.0.1 beta"
+
+# trap keyboard interrupt (control-c)
+trap control_c SIGINT
+
+function Usage {
+    cat <<USAGE
+
+Usage:
+
+`basename $0` -i InputImage -o OutputImage -t ImageModality
+
+Compulsory arguments:
+
+     -i:  Input image
+
+     -o:  Output image as the enhanced version of the input image
+
+     -t:  Image modality that describe the input image, which may be T1 or T2. (Default: T2)
+
+Optional arguments:
+
+     -s:  Image enhancement steps applied in the entire process (default = 'f')
+        f: brain volume refinement + image noise attenuation + bias field correction + global contrast enhancement (all 4 stages)
+        n: image noise attenuation only (1 stage)
+        nb: image noise attenuation + bias field correction (2 stages)
+        nbg: image noise attenuation + bias field correction + global contrast enhancement (3 stages)
+
+     -r:  Voxel resampling resolution given in mm. This will transform the input image to a different resolution (usually smaller than the original one due to computational burden) (Default: 1,1,1)
+
+     -a:  Brain atlas, which can be the fetal or neonatal options. OPTIONS: FET2012 or NEO2012. (Default: NEO2012)
+
+     -y:  Age of the subject in months. Note that depending of the chosen brain atlas, the age limits may change. (Default: 26)
+
+     -b:  Neighborhood size for the Brain Volume Refinement step. (Default: 3,3,3)
+
+     -c:  Conductance function used in the image noise attenuation step. OPTIONS: Canny, MAD, Morphological (Default: Canny)
+
+     -n:  Number of iterations used in the image noise attenuation step. (Default: 6)
+
+     -m:  A full path to an image mask used in the bias field correction step. This is recommended bacause a meaniful brain mask will strongly affects the global result of this procedure.
+
+     -l:  Modulation function used in the global contrast enhancement step. OPTIONS: Logistic. (Default: Logistic)
+
+     -e:  Chose this option if you want to save the registration transforms. This is useful for the BabyBrainSegmentation module, which recycle the previous transforms. Both affine and diffeomorphic transforms are saved in the output image folder.
+
+     -d:  Specify the full path to the Slicer executable file which the BabyBrain extension was installed. This is important if 3DSlicer was not added in the standard \$PATH of the system.
+Example:
+
+`basename $0` -i inputImage.nii.gz -o enhancedImage.nii.gz -t T2
+
+--------------------------------------------------------------------------------------
+BabyBrain was created by:
+--------------------------------------------------------------------------------------
+Antonio Carlos da S. Senra Filho
+Computing in Signal and Images in Medicine (CSIM) Laboratory
+University of Sao Paulo, Brazil
+
+script by Antonio Carlos
+
+USAGE
+    exit 1
+}
+
+function Help {
+    cat <<HELP
+
+Usage:
+
+`basename $0` -i InputImage -o OutputImage -t ImageModality
+
+Compulsory arguments:
+
+     -i:  Input image
+
+     -o:  Output image as the enhanced version of the input image
+
+     -t:  Image modality that describe the input image, which may be T1 or T2. (Default: T2)
+
+Optional arguments:
+
+     -s:  Image enhancement steps applied in the entire process (default = 'f')
+        f: brain volume refinement + image noise attenuation + bias field correction + global contrast enhancement (all 4 stages)
+        n: image noise attenuation only (1 stage)
+        nb: image noise attenuation + bias field correction (2 stages)
+        nbg: image noise attenuation + bias field correction + global contrast enhancement (3 stages)
+
+     -r:  Voxel resampling resolution given in mm. This will transform the input image to a different resolution (usually smaller than the original one due to computational burden) (Default: 1,1,1)
+
+     -a:  Brain atlas, which can be the fetal or neonatal options. OPTIONS: FET2012 or NEO2012. (Default: NEO2012)
+
+     -y:  Age of the subject in months. Note that depending of the chosen brain atlas, the age limits may change. (Default: 26)
+
+     -b:  Neighborhood size for the Brain Volume Refinement step. (Default: 3,3,3)
+
+     -c:  Conductance function used in the image noise attenuation step. OPTIONS: Canny, MAD, Morphological (Default: Canny)
+
+     -n:  Number of iterations used in the image noise attenuation step. (Default: 6)
+
+     -m:  A full path to an image mask used in the bias field correction step. This is recommended bacause a meaniful brain mask will strongly affects the global result of this procedure.
+
+     -l:  Modulation function used in the global contrast enhancement step. OPTIONS: Logistic. (Default: Logistic)
+
+     -e:  Chose this option if you want to save the registration transforms. This is useful for the BabyBrainSegmentation module, which recycle the previous transforms. Both affine and diffeomorphic transforms are saved in the output image folder.
+
+     -d:  Specify the full path to the Slicer executable file which the BabyBrain extension was installed. This is important if 3DSlicer was not added in the standard \$PATH of the system.
+
+Example:
+
+`basename $0` -i inputImage.nii.gz -o enhancedImage.nii.gz -t T2
+
+--------------------------------------------------------------------------------------
+BabyBrain was created by:
+--------------------------------------------------------------------------------------
+Antonio Carlos da S. Senra Filho
+Computing in Signal and Images in Medicine (CSIM) Laboratory
+University of Sao Paulo, Brazil
+
+script by Antonio Carlos
+
+--------------------------------------------------------------------------------------
+Get the latest BabyBrain version at:
+--------------------------------------------------------------------------------------
+https://github.com/CSIM-Toolkits/BabyBrain
+
+--------------------------------------------------------------------------------------
+Read the BabyBrain documentation at:
+--------------------------------------------------------------------------------------
+http://slicer.org/slicerWiki/index.php/Documentation/Nightly/Extensions/BabyBrain
+
+HELP
+    exit 1
+}
+
+function reportMappingParameters {
+    cat <<REPORTMAPPINGPARAMETERS
+
+--------------------------------------------------------------------------------------
+ Mapping parameters
+--------------------------------------------------------------------------------------
+ Slicer executable:         $SLICER
+ Input image:               $INPUTIMAGE
+ Output image:              $OUTPUTIMAGE
+ Image modality:            $IMAGEMODALITY_SHOW
+ Processing steps:          $PROCSTEPS
+ Image resampling:          $RESAMPLING
+ Brain atlas:               $BRAINATLAS_SHOW
+ Age:                       $AGE
+ Neighborhood size:         $NEIGHBORSIZE
+ Conductance function:      $CONDUCTANCEFUNCTION_SHOW
+ Number of iterations:      $ITERATIONS
+ Mask:                      $MASK
+ Modulation function:       $MODULATIONFUNCTION_SHOW
+======================================================================================
+REPORTMAPPINGPARAMETERS
+}
+
+control_c()
+# run if user hits control-c
+{
+  echo -en "\n*** User pressed CTRL + C ***\n"
+  exit $?
+  echo -en "\n*** Script cancelled by user ***\n"
+}
+
+# Provide output for Help
+if [[ "$1" == "-h" || $# -eq 0 ]];
+  then
+    Help >&2
+  fi
+
+#################
+#
+# default values
+#
+#################
+SLICER=`which Slicer`
+
+INPUTIMAGE=""
+OUTPUTIMAGE=""
+IMAGEMODALITY_SHOW="T2"
+IMAGEMODALITY=0
+PROCSTEPS="f"
+RESAMPLING="1,1,1"
+BRAINATLAS_SHOW="NEO2012"
+BRAINATLAS=0
+AGE="26"
+NEIGHBORSIZE="3,3,3"
+CONDUCTANCEFUNCTION_SHOW="Canny"
+CONDUCTANCEFUNCTION=0
+ITERATIONS="6"
+MASK=""
+MODULATIONFUNCTION_SHOW="Logistic"
+MODULATIONFUNCTION=0
+SAVETRANSFORMS=0
+
+# reading command line arguments
+while getopts "i:o:t:s:r:a:y:b:c:n:m:l:d:e" OPT
+  do
+  case $OPT in
+      h) #help
+   Help
+   exit 0
+   ;;
+      i)  # input image
+   INPUTIMAGE=$OPTARG
+   ;;
+      o)  # output image
+   OUTPUTIMAGE=$OPTARG
+   ;;
+      t)  # image modality
+   IMAGEMODALITY_SHOW=$OPTARG
+   ;;
+      s)  # processing steps
+   PROCSTEPS=$OPTARG
+   ;;
+      r)  # image resampling
+   RESAMPLING=$OPTARG
+   ;;
+      a)  # brain atlas
+   BRAINATLAS_SHOW=$OPTARG
+   ;;
+      y)  # age
+   AGE=$OPTARG
+   ;;
+      b) #neighborhood size
+   NEIGHBORSIZE=$OPTARG
+   ;;
+      c)  # conductance function
+   CONDUCTANCEFUNCTION_SHOW=$OPTARG
+   ;;
+      n)  # number of iterations
+   ITERATIONS=$OPTARG
+   ;;
+      m)  # image mask
+   MASK=$OPTARG
+   ;;
+      l)  # modulation function
+   MODULATIONFUNCTION_SHOW=$OPTARG
+   ;;
+      d)  # Slicer executable
+   SLICER=$OPTARG
+   ;;
+      e)  # Save transforms
+   SAVETRANSFORMS=1
+   ;;
+     \?) # getopts issues an error message
+   echo "$USAGE" >&2
+   exit 1
+   ;;
+  esac
+done
+
+###############################
+#
+# Check inputs variables
+#
+###############################
+#Checking if Slicer executable is placed in PATH
+if [[ "$SLICER" == "" ]]; then
+    echo "Slicer executable was not found"
+    echo "  Set the Slicer executable to the system path in order to found by the script."
+    exit 1
+fi
+
+if [[ ! -e $INPUTIMAGE ]]; then
+  echo "Input image does not exist."
+  exit 1
+fi
+
+if [[ ! -e $(dirname $OUTPUTIMAGE) ]]; then
+  echo "Output image folder path does not exist."
+  exit 1
+fi
+
+if [[ "$IMAGEMODALITY_SHOW" == "T1" ]]; then
+  IMAGEMODALITY=1
+elif [[ "$IMAGEMODALITY_SHOW" == "T2" ]]; then
+  IMAGEMODALITY=0
+else
+  echo "Image modality type is not available. OPTIONS: T1 or T2."
+  exit 1
+fi
+
+if [[ "$PROCSTEPS" != "f" ]]; then
+  if [[ "$PROCSTEPS" != "n" ]]; then
+    if [[ "$PROCSTEPS" != "nb" ]];then
+      if [[ "$PROCSTEPS" != "nbg" ]]; then
+          echo "Processing steps option $PROCSTEPS is not availble. OPTIONS: f, n, nb, nbg"
+          exit 1
+      fi
+    fi
+  fi
+fi
+
+if [[ "$BRAINATLAS_SHOW" == "NEO2012" ]]; then
+  BRAINATLAS=0
+elif [[ "$BRAINATLAS_SHOW" == "FET2012" ]]; then
+  BRAINATLAS=1
+else
+  echo "Brain atlas type is not available. OPTIONS: FET2012 or NEO2012."
+  exit 1
+fi
+
+if [[ $AGE -le 0 ]]; then
+  echo "Age must be an integer greater than zero."
+  exit 1
+fi
+
+if [[ "$CONDUCTANCEFUNCTION_SHOW" == "Canny" ]]; then
+  CONDUCTANCEFUNCTION=0
+elif [[ "$CONDUCTANCEFUNCTION_SHOW" == "MAD" ]]; then
+  CONDUCTANCEFUNCTION=1
+elif [[ "$CONDUCTANCEFUNCTION_SHOW" == "Morphological" ]]; then
+  CONDUCTANCEFUNCTION=2
+else
+  echo "Conductance function is not available. OPTIONS: Canny, MAD or Morphological."
+  exit 1
+fi
+
+if [[ $ITERATIONS -le 0 ]]; then
+  echo "Number of iterations must be an integer greater than zero."
+  exit 1
+fi
+
+if [[ "$MASK" != "" ]]; then
+  if [[ ! -e $MASK ]]; then
+    echo "Input mask does not exist."
+    exit 1
+  fi
+fi
+
+if [[ "$MODULATIONFUNCTION_SHOW" == "Logistic" ]]; then
+  MODULATIONFUNCTION=0
+else
+  echo "Modulation function is not available. OPTIONS: Logistic."
+  exit 1
+fi
+
+##############################
+#
+# Print out options
+#
+##############################
+
+reportMappingParameters
+
+#Create temporary python script in the input folder
+TMPATH=$(dirname $INPUTIMAGE)
+cat << EOF > ${TMPATH}/tmp_babybrainpreparation.py
+slicer.modules.babybrainpreparation.createNewWidgetRepresentation()
+module=slicer.modules.BabyBrainPreparationWidget
+
+#Setting the input and output images
+(success, inputNode)=slicer.util.loadVolume("$INPUTIMAGE", returnNode=True)
+module.inputSelector.setCurrentNode(inputNode)
+outputNode=slicer.vtkMRMLScalarVolumeNode()
+slicer.mrmlScene.AddNode(outputNode)
+module.outputSelector.setCurrentNode(outputNode)
+
+#Image modality
+module.setImageModalityBooleanWidget.setCurrentIndex($IMAGEMODALITY)
+
+#Steps
+if "$PROCSTEPS" == "n":
+    module.setApplyBrainVolumeRefinementBooleanWidget.setChecked(False)
+    module.setApplyAADBooleanWidget.setChecked(True)
+    module.setApplyBiasCorrectionBooleanWidget.setChecked(False)
+    module.setApplyGlobalEnhancementBooleanWidget.setChecked(False)
+elif "$PROCSTEPS" == "nb":
+    module.setApplyBrainVolumeRefinementBooleanWidget.setChecked(False)
+    module.setApplyAADBooleanWidget.setChecked(True)
+    module.setApplyBiasCorrectionBooleanWidget.setChecked(True)
+    module.setApplyGlobalEnhancementBooleanWidget.setChecked(False)
+elif "$PROCSTEPS" == "nbg":
+    module.setApplyBrainVolumeRefinementBooleanWidget.setChecked(False)
+    module.setApplyAADBooleanWidget.setChecked(True)
+    module.setApplyBiasCorrectionBooleanWidget.setChecked(True)
+    module.setApplyGlobalEnhancementBooleanWidget.setChecked(True)
+elif "$PROCSTEPS" == "f":
+    module.setApplyBrainVolumeRefinementBooleanWidget.setChecked(True)
+    module.setApplyAADBooleanWidget.setChecked(True)
+    module.setApplyBiasCorrectionBooleanWidget.setChecked(True)
+    module.setApplyGlobalEnhancementBooleanWidget.setChecked(True)
+
+#Image resampling
+module.setVoxelResolutionLineEditWidget.setText("$RESAMPLING")
+
+#Brain atlas
+module.setBrainAtlasComboBoxWidget.setCurrentIndex($BRAINATLAS)
+
+#Age
+module.setSubjectAgeIntegerWidget.setValue($AGE)
+
+#Neighborhood size
+module.setNeighborhoodRadiusWidget.setText("$NEIGHBORSIZE")
+
+#Conductance function and number of iterations
+module.setConductanceFunctionComboBoxWidget.setCurrentIndex($CONDUCTANCEFUNCTION)
+module.setFilteringNumberOfIterationWidget.setValue($ITERATIONS)
+
+#Image mask for bias correction
+if "$MASK" is not "":
+    (success, inputMask)=slicer.util.loadLabelVolume("$MASK", returnNode=True)
+    module.inputMaskSelector.setCurrentNode(inputMask)
+
+#Global contrast modulation function
+module.setContrastModulationFunctionComboBoxWidget.setCurrentIndex($MODULATIONFUNCTION)
+
+module.applyButton.click()
+
+if "$SAVETRANSFORMS" is "1":
+    slicer.util.saveNode(slicer.util.getNode('BabyBrain_regMNI2Native_0GenericAffine*'), "$(dirname $OUTPUTIMAGE)/BabyBrain_regMNI2Native_0GenericAffine.mat")
+    slicer.util.saveNode(slicer.util.getNode('BabyBrain_regMNI2Native_1Warp*'), "$(dirname $OUTPUTIMAGE)/BabyBrain_regMNI2Native_1Warp.nii.gz")
+
+slicer.util.saveNode(outputNode, "$OUTPUTIMAGE")
+
+exit(EXIT_SUCCESS)
+EOF
+
+#Run the script
+$SLICER --no-main-window --python-script ${TMPATH}/tmp_babybrainpreparation.py
+
+#Erasing the python script generated here
+rm ${TMPATH}/tmp_babybrainpreparation.py

@@ -65,6 +65,48 @@
       <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. This is a up limit threshold in order to avoid infinity loop in the brain volume correction. If the tolerance level does not reaches a stable results, then the number of iteration limit will stop de algorithm.]]></description>
       <default>20</default>
     </integer>
+    <boolean>
+      <name>doInitialFillHoles</name>
+      <longflag>--fillHoles</longflag>
+      <description><![CDATA[Choose if you want fill holes in the firts brain mask. This is important to not place a searching window inside the brain area.]]></description>
+      <label>Apply Binary Hole Filling</label>
+      <default>true</default>
+	</boolean>
+    <integer>
+      <name>fillHoleRadius</name>
+      <longflag>--fillHoleRadius</longflag>
+      <flag>f</flag>
+      <label>Neighborhood Radius For Fill Holes</label>
+      <description><![CDATA[A value that indicates the size of the neighborhood used in the binary filling hole procedure. This should large enough in order to detect the holes inside the input image. This parameter is only used if "Apply Binary Hole Filling" option is checked. Example: a radius of 1 creates an isotropic neighborhood of (3,3,3).]]></description>
+      <default>1</default>
+    </integer>
+    <string-enumeration>
+      <name>selectionMode</name>
+      <longflag>--selectionMode</longflag>
+      <flag>s</flag>
+      <label>Selection Mode</label>
+      <description><![CDATA[...]]></description>
+      <default>Local</default>
+      <element>Manual</element>
+      <element>Global</element>
+      <element>Local</element>
+    </string-enumeration>
+    <integer>
+      <name>manualThreshold</name>
+      <longflag>--manualThreshold</longflag>
+      <flag>t</flag>
+      <label>Manual Threshold</label>
+      <description><![CDATA[This parameter is only used if "Selection Mode = Manual" is checked.]]></description>
+      <default>1</default>
+    </integer>
+    <integer>
+      <name>majorityThreshold</name>
+      <longflag>--majorityThreshold</longflag>
+      <flag>m</flag>
+      <label>Majority Threshold</label>
+      <description><![CDATA[Majority threshold. It is the number of pixels over 50% that will decide whether an OFF pixel will become ON or not. For example, if the neighborhood of a pixel has 124 pixels (excluding itself), the 50% will be 62, and if you set up a "Majority threshold" of 5, that means that the filter will require 67 or more neighbor pixels to be ON in order to switch the current OFF pixel to ON. The default value is 1.]]></description>
+      <default>1</default>
+    </integer>
     <integer-vector>
       <name>medianRadius</name>
       <longflag>--medianRadius</longflag>
@@ -72,13 +114,5 @@
       <description><![CDATA[A list of 3 values indicating the (x,y,z) size of median filter.]]></description>
       <default>1,1,1</default>
     </integer-vector>
-    <integer>
-      <name>majorityThreshold</name>
-      <longflag>--majorityThreshold</longflag>
-      <flag>m</flag>
-      <label>Majority Threshold</label>
-      <description><![CDATA[Majority threshold. It is the number of pixels over 50% that will decide whether an OFF pixel will become ON or not. For example, if the neighborhood of a pixel has 124 pixels (excluding itself), the 50% will be 62, and if you set upd a Majority threshold of 5, that means that the filter will require 67 or more neighbor pixels to be ON in order to switch the current OFF pixel to ON. The default value is 1.]]></description>
-      <default>1</default>
-    </integer>
   </parameters>
 </executable>

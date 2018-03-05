@@ -6,7 +6,6 @@
 #include "itkBinaryThresholdImageFilter.h"
 #include "itkBinaryContourImageFilter.h"
 #include "itkImageRegionIterator.h"
-#include "itkImageRegionConstIteratorWithIndex.h"
 #include "itkNeighborhoodIterator.h"
 #include "itkConstantBoundaryCondition.h"
 #include "itkConstNeighborhoodIterator.h"
@@ -50,7 +49,6 @@ int DoIt( int argc, char * argv[], TPixel )
     inputReader->Update();
 
     typedef itk::LabelStatisticsImageFilter<InputImageType, LabelImageType>             LabelStatisticsImageFilter;
-//    typedef itk::BinaryThresholdImageFilter<InputImageType, InputImageType>             BinaryThresholdInputType;
     typedef itk::BinaryThresholdImageFilter<InputImageType, LabelImageType>             BinaryThresholdType;
     typedef itk::BinaryContourImageFilter<LabelImageType, InputImageType>               BinaryContourType;
     typedef itk::SubtractImageFilter<InputImageType, InputImageType>                    SubtractLabelType;
@@ -66,9 +64,9 @@ int DoIt( int argc, char * argv[], TPixel )
         //The user can choose if a initial hole filling procedure is passed into the input image (based on a global median filtering)
         std::cout<<"Correction of the initial brain mask requested..."<<std::endl;
         smoothInput->SetInput(inputReader->GetOutput());
-        mRadius[0] = medianRadius[0];
-        mRadius[1] = medianRadius[1];
-        mRadius[2] = medianRadius[2];
+        mRadius[0] = fillHoleRadius[0];
+        mRadius[1] = fillHoleRadius[1];
+        mRadius[2] = fillHoleRadius[2];
         smoothInput->SetRadius(mRadius);
         smoothInput->Update();
     }
@@ -126,8 +124,6 @@ int DoIt( int argc, char * argv[], TPixel )
     cuttingArea->Allocate();
     cuttingArea->FillBuffer(0);
 
-
-
     std::cout<<"*********************"<<std::endl;
     std::cout<<"BrainVolumeRefinement: Initiated"<<std::endl;
     std::cout<<"Iteration: ";
@@ -171,7 +167,7 @@ int DoIt( int argc, char * argv[], TPixel )
         globalMaskStatistics->Update();
 
         InputPixelType globalMean = static_cast<InputPixelType>(0);
-        globalMean = (globalMaskStatistics->GetMean( 1 ))/static_cast<InputPixelType>(2); //TODO Como melhorar essa suposicao de dividir por 2
+        globalMean = (globalMaskStatistics->GetMean( 1 ))/static_cast<InputPixelType>(2); //TODO Como melhorar essa suposicao de dividir por 2 - pode ser: mean - 2*std
         //************************************************************************************************************************
         //Create volume contour from the input mask
         maskContour->SetInput(estimateMask->GetOutput());
@@ -313,45 +309,22 @@ int DoIt( int argc, char * argv[], TPixel )
             ++setForRemoveIt;
         }
 
-        // Running over the image frontier again in order to ...
-        //        radius[0] = neighborRadius[0]; // TODO Colocar uma variavel para o tamanho da jaenal de corte
-        //        radius[1] = neighborRadius[1];
-        //        radius[2] = neighborRadius[2];
         itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > imageCuttingIt(radius, updatedImage,searchingRegion);
-        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > setForRemoveCuttingIt(radius, cuttingArea,searchingRegion);
+        itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > setForRemovingIt(radius, cuttingArea,searchingRegion);
 
         contourIt.GoToBegin();
         imageCuttingIt.GoToBegin();
-        setForRemoveCuttingIt.GoToBegin();
-
-        //        unsigned int totalCuttingN = (radius[0]*2 + 1)*(radius[1]*2 + 1)*(radius[2]*2 + 1);
+        setForRemovingIt.GoToBegin();
         while (!imageCuttingIt.IsAtEnd()) {
-            //            int countImgVoxels=0, countRemovingVoxels=0;
-            if (setForRemoveCuttingIt.GetCenterPixel()>static_cast<LabelPixelType>(0)) {
-                //                //Cutting out voxels that does not belongs ...
-                //                for (unsigned int p = 0; p < totalCuttingN; p++) {
-                //                    if (imageCuttingIt.GetPixel(p)!=static_cast<InputPixelType>(0)) {
-                //                        countImgVoxels++;
-                //                    }
-                //                    if (setForRemoveCuttingIt.GetPixel(p)!=static_cast<InputPixelType>(0)) {
-                //                        countRemovingVoxels++;
-                //                    }
-                //                }
-
-                //Evaluating the removing criteria using the ratio of counting voxels
-                //                int ratio = round(( (float)countRemovingVoxels /  (float)countImgVoxels ) * 2.0); //TODO Trocar para o valor de neighborhood certo! - Ver se int arredonda o valor
-                //                if(ratio != 0){
+            if (setForRemovingIt.GetCenterPixel()>static_cast<LabelPixelType>(0)) {
                 typename InputImageType::SizeType cuttingRadius;
                 int statRadiusX = radius[0]+1, statRadiusY = radius[1]+1, statRadiusZ = radius[2]+1; // Increases the calculation area in order to get a more robust statistics
                 cuttingRadius[0]=statRadiusX;
                 cuttingRadius[1]=statRadiusY;
                 cuttingRadius[2]=statRadiusZ;
-                //                updateIt.SetRadius(cuttingRadius);
-                itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > inIt(cuttingRadius, auxImage,searchingRegion);
-                //                    itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > inCuttingIt(cuttingRadius, cuttingArea,searchingRegion);
 
+                itk::NeighborhoodIterator<InputImageType, itk::ConstantBoundaryCondition<InputImageType> > inIt(cuttingRadius, auxImage,searchingRegion);
                 inIt.SetLocation(imageCuttingIt.GetIndex());
-                //                    inCuttingIt.SetLocation(imageCuttingIt.GetIndex());
 
                 /*Calculating the local statistics that will in fact remove the voxel that does not belongs to
                 * the brain regions. This estimate is based on the local median values, being here calculated
@@ -366,12 +339,11 @@ int DoIt( int argc, char * argv[], TPixel )
                 }
                 std::sort(innerValues.begin(), innerValues.end());
                 inIt.SetCenterPixel(innerValues[(inN+1)/2]);
-                //                }
             }
 
             ++contourIt;
             ++imageCuttingIt;
-            ++setForRemoveCuttingIt;
+            ++setForRemovingIt;
         }
 
         // Cleaning the brain mask in order to not propagate this for further iterations
@@ -475,7 +447,7 @@ int DoIt( int argc, char * argv[], TPixel )
     std::clock_t end = clock();
     double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
 
-    std::cout<<"finished! Total processing time of: "<<elapsed_secs/60.0<<" minutes"<<std::endl;
+    std::cout<<"finished!\nTotal processing time: "<<elapsed_secs/60.0<<" minutes"<<std::endl;
     std::cout<<"*********************"<<std::endl;
 
     //Informs what stopping criteria was reached first.

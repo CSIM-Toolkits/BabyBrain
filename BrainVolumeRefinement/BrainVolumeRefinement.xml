@@ -2,12 +2,12 @@
 <executable>
   <category>Utilities.CSIM Supporting Modules.Baby Brain</category>
   <title>Brain Volume Refinement</title>
-  <description><![CDATA[This is a CLI module for brain volume refinement, which is useful to correct the outside frontier of the brain when the brain extraction correction left some non-brain areas behind.]]></description>
-  <version>0.0.1</version>
+  <description><![CDATA[This is a CLI module for Brain Volume Refinement (BVeR), which is useful to correct brain segmentation errors that may appear in commonly brain extraction methods. The BVeR algorithm was extensivelly tested on structural MRI images (T1 and T2) of normal individuals.]]></description>
+  <version>1.0.0</version>
   <documentation-url>https://www.slicer.org/wiki/Documentation/Nightly/Modules/BrainVolumeRefinement</documentation-url>
   <license>Slicer</license>
-  <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo)</contributor>
-  <acknowledgements>This work was partially funded by CNPq grant 405574/2017-7</acknowledgements>
+  <contributor>Antonio Carlos da S. Senra Filho (University of Sao Paulo) and Fabricio Henrique Simozo (University of Sao Paulo)</contributor>
+  <acknowledgements>This work was partially funded by CNPq grant 405574/2017-7.</acknowledgements>
   <parameters>
     <label>IO</label>
     <description><![CDATA[Input/output parameters]]></description>
@@ -16,14 +16,14 @@
       <label>Input Volume</label>
       <channel>input</channel>
       <index>0</index>
-      <description><![CDATA[Input volume]]></description>
+      <description><![CDATA[Input volume. This is a previously brain extracted image which presents small segmentation outliers on the brain frontier (e.g. dura matter or bone marrow).]]></description>
     </image>
     <image type="scalar">
       <name>updatedVolume</name>
       <label>Updated Volume</label>
       <channel>output</channel>
       <index>1</index>
-      <description><![CDATA[Updated Volume]]></description>
+      <description><![CDATA[Updated Volume with the outlier segmentation being corrected.]]></description>
     </image>
     <image type="label">
       <name>updatedMask</name>
@@ -41,7 +41,7 @@
       <longflag>--neighborRadius</longflag>
       <flag>r</flag>
       <label>Neighborhood Radius</label>
-      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood. This should large enough in order to get the bounderie tissues present in the input image. The neighborhood is running over the contour of the input mask. Example: a radius of (1,1,1) creates a neighborhood of (3,3,3).]]></description>
+      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood. This should large enough in order to get a consistent local statistics (values around 3 to 8). Example: a radius of (1,1,1) creates a neighborhood of (3,3,3) in image space.]]></description>
       <default>3,3,3</default>
     </integer-vector>
     <float>
@@ -49,43 +49,47 @@
       <longflag>--convergence</longflag>
       <flag>c</flag>
       <label>Convergence</label>
-      <description><![CDATA[A percentual value that indicates how permissive is the algorithm to keep changing the brain borders. This counts how many voxels were changed in previous iterations and then estimate if the total amount of changes reaches a limit (regarind the total number of voxels changed in the brain volume). High values will result conservative outputs (less changes in the brain volume), on the other hand, low values will force a strong volume difference.]]></description>
+      <description><![CDATA[A relative value that indicates how permissive is the algorithm to keep changing the brain borders. This counts how many voxels were changed in previous iterations and then estimate wheter the total amount of changes reaches a limit (regarding the total number of voxels changed in the brain volume). High values will result conservative outputs (less changes in the brain volume), on the other hand, low values will force a strong volume difference.]]></description>
       <default>0.01</default>
       <constraints>
-        <minimum>0.0001</minimum>
-        <maximum>0.5</maximum>
+        <minimum>0.00001</minimum>
+        <maximum>0.05</maximum>
         <step>0.0001</step>
       </constraints>
     </float>
+  </parameters>
+  <parameters advanced="true">
+  <label>Advanced Parameters</label>
+    <description><![CDATA[Additional parameters to tunning BVeR response]]></description>
     <integer>
       <name>numberOfIterations</name>
       <longflag>--iterations</longflag>
       <flag>i</flag>
       <label>Number Of Iterations</label>
-      <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. This is a up limit threshold in order to avoid infinity loop in the brain volume correction. If the tolerance level does not reaches a stable results, then the number of iteration limit will stop de algorithm.]]></description>
+      <description><![CDATA[Maximum number of iterations. The brain mask is iterativelly updated in order to vanish bigger error in the previous brain extraction result. This is a up limit threshold in order to avoid infinity loop in the brain volume correction. If the convergence level does not reaches a stable results, then the number of iteration limit will stop de algorithm.]]></description>
       <default>20</default>
     </integer>
     <boolean>
       <name>doInitialFillHoles</name>
       <longflag>--fillHoles</longflag>
-      <description><![CDATA[Choose if you want fill holes in the firts brain mask. This is important to not place a searching window inside the brain area.]]></description>
+      <description><![CDATA[Choose if you want fill holes in the firts brain mask. This is important to not place a searching window inside the brain area. One can avoid this if a previous visual check was made in order to confirm that there is no zero values inside the brain area.]]></description>
       <label>Apply Binary Hole Filling</label>
-      <default>true</default>
+      <default>false</default>
 	</boolean>
-    <integer>
+    <integer-vector>
       <name>fillHoleRadius</name>
       <longflag>--fillHoleRadius</longflag>
       <flag>f</flag>
-      <label>Neighborhood Radius For Fill Holes</label>
-      <description><![CDATA[A value that indicates the size of the neighborhood used in the binary filling hole procedure. This should large enough in order to detect the holes inside the input image. This parameter is only used if "Apply Binary Hole Filling" option is checked. Example: a radius of 1 creates an isotropic neighborhood of (3,3,3).]]></description>
-      <default>1</default>
-    </integer>
+      <label>Fill Holes Radius</label>
+      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of the neighborhood used in the binary filling hole procedure. This parameter is only used if "Apply Binary Hole Filling" option is checked. Example: a radius of 1 creates an isotropic neighborhood of (3,3,3).]]></description>
+      <default>1,1,1</default>
+    </integer-vector>
     <string-enumeration>
       <name>selectionMode</name>
       <longflag>--selectionMode</longflag>
       <flag>s</flag>
       <label>Selection Mode</label>
-      <description><![CDATA[...]]></description>
+      <description><![CDATA[The BVeR algorithm relies on the estimate of non-brain voxels that are still present in the input image. These outliers voxels are detect by a determined gray level threshold, which is iterativelly updated. This option will define what is the type of the gray level threshold used in the entire process. Local=The threshold is calculated for each fixed neighborhood - Global=The threshold is set by the global image mean value (zeros are not considered) - Manual=The user defines a fixed threshold.]]></description>
       <default>Local</default>
       <element>Manual</element>
       <element>Global</element>
@@ -99,20 +103,5 @@
       <description><![CDATA[This parameter is only used if "Selection Mode = Manual" is checked.]]></description>
       <default>1</default>
     </integer>
-    <integer>
-      <name>majorityThreshold</name>
-      <longflag>--majorityThreshold</longflag>
-      <flag>m</flag>
-      <label>Majority Threshold</label>
-      <description><![CDATA[Majority threshold. It is the number of pixels over 50% that will decide whether an OFF pixel will become ON or not. For example, if the neighborhood of a pixel has 124 pixels (excluding itself), the 50% will be 62, and if you set up a "Majority threshold" of 5, that means that the filter will require 67 or more neighbor pixels to be ON in order to switch the current OFF pixel to ON. The default value is 1.]]></description>
-      <default>1</default>
-    </integer>
-    <integer-vector>
-      <name>medianRadius</name>
-      <longflag>--medianRadius</longflag>
-      <label>Median Radius</label>
-      <description><![CDATA[A list of 3 values indicating the (x,y,z) size of median filter.]]></description>
-      <default>1,1,1</default>
-    </integer-vector>
   </parameters>
 </executable>
